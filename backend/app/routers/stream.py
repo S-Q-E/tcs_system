@@ -44,7 +44,7 @@ def event_visible(event: dict[str, Any], user: CurrentUser, restricted: bool) ->
     return True
 
 
-async def whatsapp_visible(
+async def telegram_visible(
     session: AsyncSession,
     cache: dict[str, bool],
     whatsapp_id: str | None,
@@ -106,7 +106,7 @@ async def stream(
                     continue
                 if event["type"] in ("new_message", "bot_event", "outbox_status", "bot_paused"):
                     async with factory() as lookup:
-                        if not await whatsapp_visible(
+                        if not await telegram_visible(
                             lookup,
                             owner_cache,
                             (event.get("data") or {}).get("whatsapp_id"),

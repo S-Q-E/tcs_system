@@ -71,7 +71,7 @@ async def _insert_lead(factory, wa: str) -> None:
         await session.execute(
             text(
                 "INSERT INTO tcs_leads (whatsapp_id, name, current_stage, status)"
-                " VALUES (:wa, 'Realtime Bot', 'НОВЫЙ_ЛИД', 'ACTIVE')"
+                " VALUES (:wa, 'Realtime Bot', 'NEW_INQUIRY', 'ACTIVE')"
             ),
             {"wa": wa},
         )
@@ -350,7 +350,7 @@ async def test_sync_move_publishes_deal_moved(settings, clean_bus):
         async with factory() as session:
             await session.execute(
                 text(
-                    "UPDATE tcs_leads SET current_stage = 'ЗАПИСЬ', updated_at = now()"
+                    "UPDATE tcs_leads SET current_stage = 'VIEWING_SCHEDULED', updated_at = now()"
                     " WHERE whatsapp_id = :wa"
                 ),
                 {"wa": wa},
@@ -478,10 +478,10 @@ def test_task_created_visibility_filter():
     assert event_visible(task(str(other)), admin, True)
 
 
-async def test_whatsapp_visibility_lookup(client, settings):
+async def test_telegram_visibility_lookup(client, settings):
     """Bot events resolve visibility through the linked contact owner."""
     from backend.app.auth_deps import CurrentUser
-    from backend.app.routers.stream import whatsapp_visible
+    from backend.app.routers.stream import telegram_visible
 
     engine, factory = engine_factory(settings)
     wa_owned = _wa()
@@ -500,11 +500,11 @@ async def test_whatsapp_visibility_lookup(client, settings):
         try:
             async with factory() as session:
                 cache: dict[str, bool] = {}
-                assert await whatsapp_visible(session, cache, wa_owned, manager, True) is False
-                assert await whatsapp_visible(session, cache, wa_free, manager, True) is True
-                assert await whatsapp_visible(session, cache, wa_owned, manager, False) is True
+                assert await telegram_visible(session, cache, wa_owned, manager, True) is False
+                assert await telegram_visible(session, cache, wa_free, manager, True) is True
+                assert await telegram_visible(session, cache, wa_owned, manager, False) is True
                 admin_user = CurrentUser(id=uuid.uuid4(), email="a@x.com", name="A", role="admin")
-                assert await whatsapp_visible(session, cache, wa_owned, admin_user, True) is True
+                assert await telegram_visible(session, cache, wa_owned, admin_user, True) is True
         finally:
             await purge_contacts(factory, [owned["id"]])
     finally:

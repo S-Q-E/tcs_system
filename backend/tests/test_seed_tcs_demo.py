@@ -1,7 +1,7 @@
 """Tests for scripts/seed_tcs_demo.py (protection, idempotency, --reset).
 
 All database work runs inside a rolled-back transaction, so the tests never
-leave the TCS funnel or demo rows behind.
+leave demo rows behind. The TCS pipeline itself is seeded by Alembic.
 """
 
 from __future__ import annotations
@@ -37,14 +37,14 @@ async def conn(settings, db_available):
         tx = connection.transaction()
         await tx.start()
         try:
-            # The shared test DB contains fixture rows with source='whatsapp';
+            # The shared test DB contains fixture rows with source='telegram';
             # wipe the bot slice inside the transaction (rolled back later).
             for table in ("tcs_messages", "tcs_events", "tcs_followups", "tcs_ai_metrics"):
                 await connection.execute(f"DELETE FROM {table}")
             await connection.execute("DELETE FROM tcs_leads")
             yield connection
         finally:
-            await tx.rollback()  # never leave the TCS funnel or demo rows behind
+            await tx.rollback()  # never leave demo rows behind
     finally:
         await connection.close()
 
@@ -54,12 +54,10 @@ async def test_confirm_refuses_without_env():
     assert seed.confirm_error({seed.CONFIRM_ENV: seed.CONFIRM_VALUE}) is None
 
 
-async def test_schema_check_blocks_whatsapp_rows(conn):
-    # Fresh DB path: applies the fixture schema when tcs_leads is missing is
-    # covered indirectly — here the table exists, so no schema is applied.
+async def test_schema_check_blocks_telegram_rows(conn):
     await conn.execute(
         "INSERT INTO tcs_leads (whatsapp_id, source)"
-        " VALUES ($1, 'whatsapp') ON CONFLICT DO NOTHING",
+        " VALUES ($1, 'telegram') ON CONFLICT DO NOTHING",
         "tg:111111111",
     )
     error = await seed.schema_error(conn)
@@ -67,6 +65,18 @@ async def test_schema_check_blocks_whatsapp_rows(conn):
 
     await conn.execute("DELETE FROM tcs_leads WHERE whatsapp_id = 'tg:111111111'")
     assert await seed.schema_error(conn) is None
+
+
+async def test_pipeline_must_exist_and_match(conn):
+    assert await seed.pipeline_error(conn) is None
+
+    # The script never creates or renames pipeline rows; a missing or
+    # different pipeline is an error.
+    await conn.execute(
+        "UPDATE crm_pipelines SET name = 'Renamed' WHERE name = $1", seed.PIPELINE_NAME
+    )
+    error = await seed.pipeline_error(conn)
+    assert error is not None and "not found" in error
 
 
 async def test_seed_idempotent_and_complete(conn):
@@ -78,40 +88,36 @@ async def test_seed_idempotent_and_complete(conn):
     assert first["leads"] == 30
     assert first["units"] == 14
 
-    # TCS pipeline is the single default.
-    defaults = await conn.fetch("SELECT name FROM crm_pipelines WHERE is_default ORDER BY name")
-    assert [row["name"] for row in defaults] == ["TCS Leasing"]
-
+    # The pipeline is the only one and has exactly six stages (from Alembic).
+    pipelines = await conn.fetch("SELECT name, is_default FROM crm_pipelines ORDER BY name")
+    assert [row["name"] for row in pipelines] == ["TCS Leasing"]
+    assert pipelines[0]["is_default"] is True
     stages = await conn.fetch(
-        "SELECT name, bot_stage_key, kind, bot_status_key FROM crm_stages"
+        "SELECT name, kind, bot_stage_key, bot_status_key FROM crm_stages"
         " WHERE pipeline_id = (SELECT id FROM crm_pipelines WHERE name = 'TCS Leasing')"
         " ORDER BY sort"
     )
     assert [row["name"] for row in stages] == [
         "New inquiry",
-        "Qualifying",
-        "Unit matched",
+        "Qualified",
         "Viewing scheduled",
-        "Viewing confirmed",
         "Viewing done",
-        "Application sent",
-        "Follow-up",
         "Leased",
         "Lost",
     ]
     won = next(row for row in stages if row["name"] == "Leased")
-    assert won["bot_status_key"] == "КЛИЕНТ"
+    assert won["bot_status_key"] == "LEASED"
     lost = next(row for row in stages if row["name"] == "Lost")
-    assert lost["bot_status_key"] == "ОТКАЗ"
+    assert lost["bot_status_key"] == "LOST"
 
-    # unanswered_after_minutes is a JSON number 2 (RECON.md §3).
+    # unanswered_after_minutes is a JSON number 2.
     raw = await conn.fetchval(
         "SELECT value FROM crm_settings WHERE key = 'unanswered_after_minutes'"
     )
     value = json.loads(raw) if isinstance(raw, str) else raw
     assert value == 2
 
-    # Demo leads: exactly one unanswered dialog (last message 'in', bot live).
+    # Exactly one unanswered dialog: NEW_INQUIRY, last message 'in' ~30 min ago.
     last_directions = await conn.fetch(
         """
         SELECT DISTINCT ON (l.whatsapp_id) l.whatsapp_id, m.direction
@@ -122,37 +128,58 @@ async def test_seed_idempotent_and_complete(conn):
         """
     )
     incoming = [row["whatsapp_id"] for row in last_directions if row["direction"] == "in"]
-    assert incoming == ["tg:900000004"]
+    assert incoming == ["tg:900000000"]
+    unanswered_stage = await conn.fetchval(
+        "SELECT current_stage FROM tcs_leads WHERE whatsapp_id = 'tg:900000000'"
+    )
+    assert unanswered_stage == "NEW_INQUIRY"
 
-    # ...and that unanswered message is ~30 minutes old (spec).
     last_in = await conn.fetchval(
         """
         SELECT m.created_at FROM tcs_leads l
         JOIN tcs_messages m ON m.whatsapp_id = l.whatsapp_id
-        WHERE l.source = 'demo' AND l.whatsapp_id = 'tg:900000004'
+        WHERE l.source = 'demo' AND l.whatsapp_id = 'tg:900000000'
         ORDER BY m.created_at DESC LIMIT 1
         """
     )
     age_minutes = (datetime.now(UTC) - last_in).total_seconds() / 60
     assert 25 <= age_minutes <= 40, age_minutes
 
-    # 12 viewings: 9 past + 3 future.
-    trials = await conn.fetch(
-        "SELECT trial_datetime FROM tcs_leads WHERE source = 'demo' AND trial_datetime IS NOT NULL"
+    # 4 / 6 / 4 / 8 / 3 / 5 leads per stage.
+    per_stage = await conn.fetch(
+        "SELECT current_stage, COUNT(*) AS n FROM tcs_leads WHERE source = 'demo'"
+        " GROUP BY current_stage"
     )
-    assert len(trials) == 12
+    assert {row["current_stage"]: row["n"] for row in per_stage} == {
+        "NEW_INQUIRY": 4,
+        "QUALIFIED": 6,
+        "VIEWING_SCHEDULED": 4,
+        "VIEWING_DONE": 8,
+        "LEASED": 3,
+        "LOST": 5,
+    }
 
-    # Managers and terminal statuses are present.
+    # Viewings: 4 upcoming, 8 done, 3 missed/cancelled back in Qualified,
+    # and 3 leased after their viewing.
+    trials = await conn.fetchval(
+        "SELECT COUNT(*) FROM tcs_leads WHERE source = 'demo' AND trial_datetime IS NOT NULL"
+    )
+    assert trials == 18
+    future = await conn.fetchval(
+        "SELECT COUNT(*) FROM tcs_leads WHERE source = 'demo' AND trial_datetime > now()"
+    )
+    assert future == 4
+
+    # Statuses: two handoffs, three leased, five lost.
     statuses = await conn.fetch(
         "SELECT status, COUNT(*) AS n FROM tcs_leads WHERE source = 'demo' GROUP BY status"
     )
     by_status = {row["status"]: row["n"] for row in statuses}
-    assert by_status.get("МЕНЕДЖЕР") == 2
-    assert by_status.get("КЛИЕНТ") == 2
-    assert by_status.get("ОТКАЗ") == 3
+    assert by_status.get("HANDOFF") == 2
+    assert by_status.get("LEASED") == 3
+    assert by_status.get("LOST") == 5
 
-    # After-hours share ≈ 40% (12 of 30), checked with the same rule the
-    # analytics Phase 3 helper will use (Mon-Fri 09:00-17:00 ET).
+    # After-hours share is 12 of 30 (Mon-Fri 09:00-17:00 ET).
     from zoneinfo import ZoneInfo
 
     et = ZoneInfo("America/New_York")
@@ -181,7 +208,7 @@ async def test_reset_only_deletes_demo_rows(conn):
     # Foreign (non-demo) rows must survive --reset.
     await conn.execute(
         "INSERT INTO tcs_leads (whatsapp_id, source)"
-        " VALUES ($1, 'whatsapp') ON CONFLICT DO NOTHING",
+        " VALUES ($1, 'telegram') ON CONFLICT DO NOTHING",
         "tg:999999999",
     )
     await conn.execute(
@@ -226,15 +253,11 @@ async def test_no_truncate_and_demo_marker(conn):
         "SELECT DISTINCT source FROM tcs_leads WHERE whatsapp_id LIKE 'tg:900%'"
     )
     assert {row["source"] for row in sources} == {"demo"}
-    # lead_data carries the demo extras.
     row = await conn.fetchrow("SELECT lead_data FROM tcs_leads WHERE source = 'demo' LIMIT 1")
     data = row["lead_data"] if isinstance(row["lead_data"], dict) else json.loads(row["lead_data"])
     assert set(data) == {"budget_usd", "unit", "pets"}
-    # Nothing wrote via TRUNCATE: the transaction-scoped DELETE path is what
-    # reset uses (verified above); here we only assert the module never calls it.
     source = Path(seed.__file__).read_text(encoding="utf-8")
     assert "TRUNCATE TABLE" not in source
-    # crm_settings access stays valid JSONB (no string "2").
     raw = await conn.fetchval(
         "SELECT value::text FROM crm_settings WHERE key = 'unanswered_after_minutes'"
     )

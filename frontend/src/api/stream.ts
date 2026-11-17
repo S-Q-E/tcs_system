@@ -30,7 +30,7 @@ export function backoffDelay(attempt: number): number {
   return Math.min(1000 * 2 ** Math.max(0, attempt), 30000);
 }
 
-function whatsappOf(data: Record<string, unknown>): string | null {
+function telegramOf(data: Record<string, unknown>): string | null {
   return typeof data.whatsapp_id === "string" ? data.whatsapp_id : null;
 }
 
@@ -39,7 +39,7 @@ export function invalidationFor(event: StreamEvent): string[][] {
   switch (event.type) {
     case "new_message": {
       const keys: string[][] = [["dialogs"], ["timeline"]];
-      const wa = whatsappOf(event.data);
+      const wa = telegramOf(event.data);
       if (wa) {
         keys.push(["lead-messages", wa], ["dialog", wa], ["outbox", wa]);
       }
@@ -57,11 +57,11 @@ export function invalidationFor(event: StreamEvent): string[][] {
     case "notification":
       return [["notifications"]];
     case "bot_paused": {
-      const wa = whatsappOf(event.data);
+      const wa = telegramOf(event.data);
       return wa ? [["dialog", wa], ["dialogs"]] : [["dialogs"]];
     }
     case "outbox_status": {
-      const wa = whatsappOf(event.data);
+      const wa = telegramOf(event.data);
       return wa
         ? [
             ["outbox", wa],

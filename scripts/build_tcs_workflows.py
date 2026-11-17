@@ -26,9 +26,8 @@ N8N_DIR = ROOT / "docs" / "n8n"
 TCS_DOCS = ROOT / "docs" / "tcs"
 WORKFLOWS = ROOT / "workflows"
 
-SEND_WA = N8N_DIR / "crm-send-message.workflow.json"
 BOT_ORIGINAL = Path(
-    os.environ.get("TCS_BOT_TEMPLATE", N8N_DIR / "reference-whatsapp-v2.workflow.json")
+    os.environ.get("TCS_BOT_TEMPLATE", N8N_DIR / "reference-telegram-v2.workflow.json")
 )
 TOOLS_SPEC = TCS_DOCS / "tools-spec.md"
 BOT_PROMPT = TCS_DOCS / "bot-prompt.md"
@@ -43,13 +42,9 @@ TOOLS_MIN = ("search_units", "get_slots", "book_viewing", "handoff_to_human")
 
 TCS_STAGES = [
     "NEW_INQUIRY",
-    "QUALIFYING",
-    "UNIT_MATCHED",
+    "QUALIFIED",
     "VIEWING_SCHEDULED",
-    "VIEWING_CONFIRMED",
     "VIEWING_DONE",
-    "APPLICATION_SENT",
-    "FOLLOW_UP",
 ]
 TCS_ACTIONS = [
     "none",
@@ -134,21 +129,121 @@ def workflow(name: str, nodes: list[dict], connections: dict) -> dict:
 
 
 def build_send_message() -> dict:
-    src = json.loads(SEND_WA.read_text(encoding="utf-8"))
-    nodes = [n for n in src["nodes"] if n["name"] not in ("Send WhatsApp Message", "Send OK?")]
-    for n in nodes:
-        if n["name"] == "Sticky Note":
-            n["parameters"]["content"] = (
-                "## TCS Send Message (Telegram)\n"
-                "1. Import: Workflows -> Import from file. Attach credentials in the UI: "
-                "`Postgres account`, `Telegram account` (the NEW demo bot).\n"
-                "2. `n8n_processed_outbox` comes from docs/n8n/README.md.\n"
-                "3. Env `N8N_WEBHOOK_SECRET` in n8n = CRM `N8N_WEBHOOK_SECRET`.\n"
-                "4. Telegram has no `success` field: success output -> Mark Sent -> Respond OK; "
-                "error output -> Respond Error (502). Dedupe row is written only after a successful send.\n"
-                "5. Activate; webhook URL https://<n8n>/webhook/crm-send-message -> CRM `N8N_SEND_WEBHOOK_URL`."
-            )
-    nodes.append(
+    """W-A: the CRM outbox contract, delivered through Telegram."""
+    nodes = [
+        node(
+            "CRM Send Webhook",
+            "n8n-nodes-base.webhook",
+            2,
+            [-672, 400],
+            {
+                "httpMethod": "POST",
+                "path": "crm-send-message",
+                "responseMode": "responseNode",
+                "options": {},
+            },
+            webhookId="crm-send-message",
+        ),
+        node(
+            "Check Secret",
+            "n8n-nodes-base.if",
+            2.2,
+            [-400, 384],
+            {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": True,
+                        "leftValue": "",
+                        "typeValidation": "loose",
+                        "version": 2,
+                    },
+                    "conditions": [
+                        {
+                            "id": "cond-secret-nonempty",
+                            "leftValue": '={{ $json.headers["x-crm-secret"] }}',
+                            "operator": {
+                                "type": "string",
+                                "operation": "notEmpty",
+                                "singleValue": True,
+                            },
+                        },
+                        {
+                            "id": "cond-secret",
+                            "leftValue": '={{ $json.headers["x-crm-secret"] }}',
+                            "rightValue": "={{ $env.N8N_WEBHOOK_SECRET }}",
+                            "operator": {"type": "string", "operation": "equals"},
+                        },
+                    ],
+                    "combinator": "and",
+                },
+                "looseTypeValidation": True,
+                "options": {},
+            },
+        ),
+        node(
+            "Respond 401",
+            "n8n-nodes-base.respondToWebhook",
+            1.1,
+            [-400, 576],
+            {
+                "respondWith": "json",
+                "responseBody": '={"ok": false, "error": "unauthorized"}',
+                "options": {"responseCode": 401},
+            },
+        ),
+        node(
+            "Check Duplicate",
+            "n8n-nodes-base.postgres",
+            2.4,
+            [-176, 384],
+            {
+                "operation": "executeQuery",
+                "query": "SELECT COUNT(*) AS seen, MAX(provider_message_id) AS provider_message_id"
+                " FROM n8n_processed_outbox WHERE outbox_id = $1::uuid",
+                "options": {"queryReplacement": "={{ $json.body.outbox_id }}"},
+            },
+            credentials=POSTGRES_CREDS,
+            alwaysOutputData=True,
+        ),
+        node(
+            "Is Duplicate",
+            "n8n-nodes-base.if",
+            2.2,
+            [48, 384],
+            {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": True,
+                        "leftValue": "",
+                        "typeValidation": "loose",
+                        "version": 2,
+                    },
+                    "conditions": [
+                        {
+                            "id": "cond-seen",
+                            "leftValue": "={{ $json.seen }}",
+                            "rightValue": 0,
+                            "operator": {"type": "number", "operation": "larger"},
+                        }
+                    ],
+                    "combinator": "and",
+                },
+                "looseTypeValidation": True,
+                "options": {},
+            },
+        ),
+        node(
+            "Respond Duplicate",
+            "n8n-nodes-base.respondToWebhook",
+            1.1,
+            [128, 160],
+            {
+                "respondWith": "json",
+                "responseBody": "={{ JSON.stringify({ ok: true, deduped: true,"
+                " provider_message_id: $json.provider_message_id ?? null }) }}",
+                "options": {"responseCode": 200},
+            },
+        ),
         node(
             "Send Telegram Message",
             "n8n-nodes-base.telegram",
@@ -162,24 +257,70 @@ def build_send_message() -> dict:
             },
             credentials=TELEGRAM_CREDS,
             onError="continueErrorOutput",
-        )
-    )
-    src["nodes"] = nodes
-
-    conns = src["connections"]
-    conns.pop("Send WhatsApp Message", None)
-    conns.pop("Send OK?", None)
-    conns["Is Duplicate"]["main"][1] = [
-        {"node": "Send Telegram Message", "type": "main", "index": 0}
+        ),
+        node(
+            "Mark Sent",
+            "n8n-nodes-base.postgres",
+            2.4,
+            [496, 336],
+            {
+                "operation": "executeQuery",
+                "query": "INSERT INTO n8n_processed_outbox (outbox_id, provider_message_id)"
+                " VALUES ($1::uuid, NULL) ON CONFLICT (outbox_id) DO NOTHING",
+                "options": {
+                    "queryReplacement": "={{ $('CRM Send Webhook').item.json.body.outbox_id }}"
+                },
+            },
+            credentials=POSTGRES_CREDS,
+            onError="continueRegularOutput",
+        ),
+        node(
+            "Respond OK",
+            "n8n-nodes-base.respondToWebhook",
+            1.1,
+            [720, 336],
+            {
+                "respondWith": "json",
+                "responseBody": '={"ok": true, "provider_message_id": null}',
+                "options": {"responseCode": 200},
+            },
+        ),
+        node(
+            "Respond Error",
+            "n8n-nodes-base.respondToWebhook",
+            1.1,
+            [720, 512],
+            {
+                "respondWith": "json",
+                "responseBody": '={"ok": false, "error": "provider send failed"}',
+                "options": {"responseCode": 502},
+            },
+        ),
+        sticky(
+            "Sticky Note",
+            "## TCS Send Message (Telegram)\n"
+            "1. Import: Workflows -> Import from file. Attach credentials in the UI: "
+            "`Postgres account`, `Telegram account` (the demo bot).\n"
+            "2. `n8n_processed_outbox` comes from docs/n8n/README.md.\n"
+            "3. Env `N8N_WEBHOOK_SECRET` in n8n = CRM `N8N_WEBHOOK_SECRET`.\n"
+            "4. Telegram has no `success` field: success output -> Mark Sent -> Respond OK; "
+            "error output -> Respond Error (502). Dedupe is written only after a successful send.\n"
+            "5. Activate; webhook URL https://<n8n>/webhook/crm-send-message -> CRM `N8N_SEND_WEBHOOK_URL`.",
+            [-1152, -16],
+        ),
     ]
-    conns["Send Telegram Message"] = {
-        "main": [
-            [{"node": "Mark Sent", "type": "main", "index": 0}],
-            [{"node": "Respond Error", "type": "main", "index": 0}],
-        ]
-    }
-    src["name"] = "TCS Send Message (Telegram)"
-    return src
+
+    conns: dict = {}
+    link(conns, "CRM Send Webhook", ["Check Secret"])
+    link(conns, "Check Secret", ["Check Duplicate"], output=0)
+    link(conns, "Check Secret", ["Respond 401"], output=1)
+    link(conns, "Check Duplicate", ["Is Duplicate"])
+    link(conns, "Is Duplicate", ["Respond Duplicate"], output=0)
+    link(conns, "Is Duplicate", ["Send Telegram Message"], output=1)
+    link(conns, "Send Telegram Message", ["Mark Sent"], output=0)
+    link(conns, "Send Telegram Message", ["Respond Error"], output=1)
+    link(conns, "Mark Sent", ["Respond OK"])
+    return workflow("TCS Send Message (Telegram)", nodes, conns)
 
 
 # ---------------------------------------------------------------------- W-B
@@ -225,8 +366,7 @@ def _parser_schema() -> str:
 
 def _validate_js() -> str:
     return """
-const allowedStages = ["NEW_INQUIRY","QUALIFYING","UNIT_MATCHED","VIEWING_SCHEDULED",
-"VIEWING_CONFIRMED","VIEWING_DONE","APPLICATION_SENT","FOLLOW_UP"];
+const allowedStages = ["NEW_INQUIRY","QUALIFIED","VIEWING_SCHEDULED","VIEWING_DONE"];
 const allowedActions = ["none","update_data","transfer_to_manager","set_followup","mark_lost","mark_won"];
 
 const agentOutput = ($json.output && typeof $json.output === 'object') ? $json.output : {};
@@ -246,11 +386,11 @@ const confidence = (typeof agentOutput.confidence === 'number') ? agentOutput.co
 const internalNote = (typeof agentOutput.internal_note === 'string') ? agentOutput.internal_note : '';
 
 let status = lead.status;
-if (newStage === 'VIEWING_SCHEDULED' || newStage === 'VIEWING_CONFIRMED') status = 'ЗАПИСАН';
-else if (action === 'transfer_to_manager') status = 'МЕНЕДЖЕР';
-else if (action === 'mark_lost') status = 'ОТКАЗ';
-else if (action === 'mark_won') status = 'КЛИЕНТ';
-else if (action === 'set_followup') status = 'ДУМАЕТ';
+if (newStage === 'VIEWING_SCHEDULED') status = 'VIEWING_BOOKED';
+else if (action === 'transfer_to_manager') status = 'HANDOFF';
+else if (action === 'mark_lost') status = 'LOST';
+else if (action === 'mark_won') status = 'LEASED';
+else if (action === 'set_followup') status = 'THINKING';
 
 const events = [];
 if (newStage !== lead.current_stage) {
@@ -703,7 +843,7 @@ whatsapp_id: {{ $('Upsert & Load Lead State').item.json.whatsapp_id }}
             {
                 "operation": "executeQuery",
                 "query": "WITH upd AS ("
-                " UPDATE tcs_leads SET status = 'МЕНЕДЖЕР', updated_at = now()"
+                " UPDATE tcs_leads SET status = 'HANDOFF', updated_at = now()"
                 " WHERE whatsapp_id = $1 RETURNING whatsapp_id"
                 "), ev AS ("
                 " INSERT INTO tcs_events (whatsapp_id, event_type, payload)"
@@ -852,14 +992,6 @@ whatsapp_id: {{ $('Upsert & Load Lead State').item.json.whatsapp_id }}
             credentials=POSTGRES_CREDS,
         )
     )
-    # Google Sheets sync stays in the canvas but disabled, per the brief
-    # ("убрать, не удалять"). It keeps the original params for reference.
-    sheets = json.loads(json.dumps(known["Синхронизация лида с Google Sheets"], ensure_ascii=False))
-    sheets["id"] = nid("Google Sheets sync (disabled)")
-    sheets["position"] = [3440, 940]
-    sheets["disabled"] = True
-    sheets["credentials"] = {"googleSheetsOAuth2Api": {"name": "Google Sheets account"}}
-    nodes.append(sheets)
     nodes.append(
         sticky(
             "Sticky - setup",

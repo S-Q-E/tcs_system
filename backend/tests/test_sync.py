@@ -25,7 +25,7 @@ def _factory(settings):
     return engine, async_sessionmaker(bind=engine, expire_on_commit=False)
 
 
-async def _insert_lead(session, n: int, stage: str = "НОВЫЙ_ЛИД", status: str = "ACTIVE") -> str:
+async def _insert_lead(session, n: int, stage: str = "NEW_INQUIRY", status: str = "ACTIVE") -> str:
     wa = _wa(n)
     await session.execute(
         text(
@@ -151,24 +151,24 @@ async def test_backfill_seed_leads(settings):
         assert stats.leads_seen >= 6
 
         lead1 = await _deal_info(factory, "77010000001@c.us")
-        assert lead1["stage"] == "Новый лид"
-        assert lead1["bot_stage_key"] == "НОВЫЙ_ЛИД"
+        assert lead1["stage"] == "New inquiry"
+        assert lead1["bot_stage_key"] == "NEW_INQUIRY"
         assert lead1["status"] == "open"
-        assert lead1["contact_name"] == "Айгерим Тестова"
-        assert lead1["contact_custom"]["goal"] == "Шить для себя"
+        assert lead1["contact_name"] == "Alice Demo"
+        assert lead1["contact_custom"]["goal"] == "Rent for myself"
 
         client = await _deal_info(factory, "77010000005@c.us")
         assert client["status"] == "won"
-        assert client["stage"] == "Клиент"
+        assert client["stage"] == "Leased"
         assert client["closed_at"] is not None
 
         lost = await _deal_info(factory, "77010000006@c.us")
         assert lost["status"] == "lost"
-        assert lost["stage"] == "Отказ"
+        assert lost["stage"] == "Lost"
         assert lost["closed_at"] is not None
 
         booked = await _deal_info(factory, "77010000002@c.us")
-        assert booked["stage"] == "Запись"
+        assert booked["stage"] == "Viewing scheduled"
         assert booked["trial_at"] is not None
 
         async with factory() as session:
@@ -211,13 +211,13 @@ async def test_bot_stage_move_writes_history(settings):
         try:
             await run_sync_cycle(factory)
             info = await _deal_info(factory, wa)
-            assert info["bot_stage_key"] == "НОВЫЙ_ЛИД"
+            assert info["bot_stage_key"] == "NEW_INQUIRY"
 
             async with factory() as session:
                 await session.execute(
                     text(
-                        "UPDATE tcs_leads SET current_stage = 'ЗАПИСЬ',"
-                        " previous_stage = 'НОВЫЙ_ЛИД', updated_at = now()"
+                        "UPDATE tcs_leads SET current_stage = 'VIEWING_SCHEDULED',"
+                        " previous_stage = 'NEW_INQUIRY', updated_at = now()"
                         " WHERE whatsapp_id = :wa"
                     ),
                     {"wa": wa},
@@ -227,7 +227,7 @@ async def test_bot_stage_move_writes_history(settings):
             stats = await run_sync_cycle(factory)
             assert stats.moved == 1
             info = await _deal_info(factory, wa)
-            assert info["bot_stage_key"] == "ЗАПИСЬ"
+            assert info["bot_stage_key"] == "VIEWING_SCHEDULED"
             assert info["trial_at"] is not None
 
             async with factory() as session:
@@ -257,7 +257,7 @@ async def test_stage_locked_blocks_move_but_logs(settings):
     engine, factory = _factory(settings)
     try:
         async with factory() as session:
-            wa = await _insert_lead(session, 12, stage="КВАЛИФИКАЦИЯ")
+            wa = await _insert_lead(session, 12, stage="QUALIFIED")
             await session.commit()
         try:
             await run_sync_cycle(factory)
@@ -278,7 +278,7 @@ async def test_stage_locked_blocks_move_but_logs(settings):
                 )
                 await session.execute(
                     text(
-                        "UPDATE tcs_leads SET current_stage = 'ПРЕЗЕНТАЦИЯ_РЕШЕНИЯ',"
+                        "UPDATE tcs_leads SET current_stage = 'VIEWING_SCHEDULED',"
                         " updated_at = now() WHERE whatsapp_id = :wa"
                     ),
                     {"wa": wa},
@@ -291,7 +291,7 @@ async def test_stage_locked_blocks_move_but_logs(settings):
             assert stats.blocked == 1
 
             info = await _deal_info(factory, wa)
-            assert info["bot_stage_key"] == "КВАЛИФИКАЦИЯ"
+            assert info["bot_stage_key"] == "QUALIFIED"
             assert (await _counts(factory))["crm_deal_stage_history"] == history_before
 
             async with factory() as session:
@@ -310,7 +310,7 @@ async def test_stage_locked_blocks_move_but_logs(settings):
                     .one()
                 )
                 assert blocked["action"] == "bot_stage_blocked"
-                assert blocked["diff"]["lead_stage"] == "ПРЕЗЕНТАЦИЯ_РЕШЕНИЯ"
+                assert blocked["diff"]["lead_stage"] == "VIEWING_SCHEDULED"
         finally:
             await _purge(factory, [12])
     finally:
@@ -328,7 +328,7 @@ async def test_status_client_and_lost_close_deal(settings):
             async with factory() as session:
                 await session.execute(
                     text(
-                        "UPDATE tcs_leads SET status = 'КЛИЕНТ', updated_at = now()"
+                        "UPDATE tcs_leads SET status = 'LEASED', updated_at = now()"
                         " WHERE whatsapp_id = :wa"
                     ),
                     {"wa": wa},
@@ -337,13 +337,13 @@ async def test_status_client_and_lost_close_deal(settings):
             await run_sync_cycle(factory)
             info = await _deal_info(factory, wa)
             assert info["status"] == "won"
-            assert info["stage"] == "Клиент"
+            assert info["stage"] == "Leased"
             assert info["closed_at"] is not None
 
             async with factory() as session:
                 await session.execute(
                     text(
-                        "UPDATE tcs_leads SET status = 'ОТКАЗ', updated_at = now()"
+                        "UPDATE tcs_leads SET status = 'LOST', updated_at = now()"
                         " WHERE whatsapp_id = :wa"
                     ),
                     {"wa": wa},
@@ -352,7 +352,7 @@ async def test_status_client_and_lost_close_deal(settings):
             await run_sync_cycle(factory)
             info = await _deal_info(factory, wa)
             assert info["status"] == "lost"
-            assert info["stage"] == "Отказ"
+            assert info["stage"] == "Lost"
         finally:
             await _purge(factory, [13])
     finally:
@@ -363,12 +363,12 @@ async def test_unknown_stage_falls_back_to_first_open(settings):
     engine, factory = _factory(settings)
     try:
         async with factory() as session:
-            wa = await _insert_lead(session, 14, stage="НЕСУЩЕСТВУЮЩИЙ_ЭТАП")
+            wa = await _insert_lead(session, 14, stage="DOES_NOT_EXIST")
             await session.commit()
         try:
             await run_sync_cycle(factory)
             info = await _deal_info(factory, wa)
-            assert info["stage"] == "Новый лид"
+            assert info["stage"] == "New inquiry"
             assert info["status"] == "open"
         finally:
             await _purge(factory, [14])
@@ -515,7 +515,7 @@ async def test_bot_phone_source_and_lead_data_sync(settings):
                 text(
                     "INSERT INTO tcs_leads"
                     " (whatsapp_id, name, current_stage, status, phone, source, lead_data)"
-                    " VALUES (:wa, 'TCS Lead', 'НОВЫЙ_ЛИД', 'ACTIVE',"
+                    " VALUES (:wa, 'TCS Lead', 'NEW_INQUIRY', 'ACTIVE',"
                     " '+1 215 555 0100', 'tcs_demo', CAST(:data AS jsonb))"
                 ),
                 {
@@ -650,7 +650,7 @@ async def test_load_idle_cycle_under_one_second(settings):
                     " (whatsapp_id, name, current_stage, status, goal, created_at, updated_at,"
                     " last_message_at)"
                     " SELECT :prefix || lpad(g::text, 5, '0') || '@c.us',"
-                    " 'Load ' || g, 'НОВЫЙ_ЛИД', 'ACTIVE', 'load goal',"
+                    " 'Load ' || g, 'NEW_INQUIRY', 'ACTIVE', 'load goal',"
                     " now() - interval '1 hour', now() - interval '1 hour',"
                     " now() - interval '1 hour'"
                     " FROM generate_series(0, 2999) g"
@@ -715,7 +715,7 @@ async def test_seed_is_idempotent(tx_session):
     counts = {}
     for table, expected in (
         ("crm_pipelines", 1),
-        ("crm_stages", 16),
+        ("crm_stages", 6),
         ("crm_lost_reasons", 5),
     ):
         counts[table] = (await tx_session.execute(text(f"SELECT COUNT(*) FROM {table}"))).scalar()

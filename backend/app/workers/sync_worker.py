@@ -19,9 +19,9 @@ from ..models import (
     DEAL_STATUS_WON,
     HISTORY_SOURCE_BOT,
     HISTORY_SOURCE_SYSTEM,
-    STATUS_CLIENT,
+    STATUS_HANDOFF,
+    STATUS_LEASED,
     STATUS_LOST,
-    STATUS_MANAGER,
     CrmActivityLog,
     CrmContact,
     CrmConversationState,
@@ -493,14 +493,14 @@ async def _sync_batch(
     next_pos: dict[uuid.UUID, Any] = {}
     if pending:
         bottoms = await _stage_tops(session, list({target.id for _, _, target, _ in pending}))
-        # Сколько новых карточек получит каждая стадия в этой пачке, чтобы
-        # первая созданная оказалась сверху, а остальные — по порядку создания.
+        # How many new cards each stage receives in this batch, so the
+        # first created one ends up on top and the rest follow by creation order.
         counts: dict[uuid.UUID, int] = {}
         for _, _, target, _ in pending:
             counts[target.id] = counts.get(target.id, 0) + 1
         for stage_id, count in counts.items():
             bottom = bottoms.get(stage_id)
-            # Стадия с карточками заканчивается на min-1, пустая — на 0.
+            # A stage with cards ends at min-1, an empty one at 0.
             next_pos[stage_id] = (bottom - count) if bottom is not None else Decimal(-(count - 1))
 
     new_contact_ids: set[uuid.UUID] = set()
@@ -682,8 +682,8 @@ def _resolve_target(
     funnel: _Funnel, status: str | None, current_stage: str | None
 ) -> tuple[CrmStage, str]:
     """Bot status wins (client/lost finals); otherwise map the bot stage key."""
-    if status == STATUS_CLIENT and STATUS_CLIENT in funnel.by_status_key:
-        stage = funnel.by_status_key[STATUS_CLIENT]
+    if status == STATUS_LEASED and STATUS_LEASED in funnel.by_status_key:
+        stage = funnel.by_status_key[STATUS_LEASED]
         return stage, DEAL_STATUS_WON
     if status == STATUS_LOST and STATUS_LOST in funnel.by_status_key:
         stage = funnel.by_status_key[STATUS_LOST]
@@ -835,8 +835,8 @@ async def _maybe_handover(
     auto_pause: Any,
     stats: SyncStats,
 ) -> None:
-    """On МЕНЕДЖЕР status notify managers; pause only if set. No automatic task."""
-    if lead.get("status") != STATUS_MANAGER:
+    """On HANDOFF status notify managers; pause only if set. No automatic task."""
+    if lead.get("status") != STATUS_HANDOFF:
         return
     if deal.owner_id is not None:
         targets = [deal.owner_id]

@@ -33,7 +33,7 @@ async def _insert_lead(factory, wa: str) -> None:
         await session.execute(
             text(
                 "INSERT INTO tcs_leads (whatsapp_id, name, current_stage, status)"
-                " VALUES (:wa, 'Outbox Bot', 'НОВЫЙ_ЛИД', 'ACTIVE')"
+                " VALUES (:wa, 'Outbox Bot', 'NEW_INQUIRY', 'ACTIVE')"
             ),
             {"wa": wa},
         )
@@ -133,7 +133,7 @@ async def test_queue_message_returns_202_and_autopauses(client, settings):
         token = await admin_csrf(client, settings)
         await _insert_lead(factory, wa)
         response = await client.post(
-            f"/api/chats/{wa}/messages", json={"body": "Здравствуйте!"}, headers=csrf_headers(token)
+            f"/api/chats/{wa}/messages", json={"body": "Hello!"}, headers=csrf_headers(token)
         )
         assert response.status_code == 202, response.text
         body = response.json()
@@ -193,7 +193,7 @@ async def test_worker_sends_mirrors_and_is_idempotent(client, settings):
         await _insert_lead(factory, wa)
         queued = await client.post(
             f"/api/chats/{wa}/messages",
-            json={"body": "Приходите завтра"},
+            json={"body": "See you tomorrow"},
             headers=csrf_headers(token),
         )
         assert queued.status_code == 202
@@ -203,7 +203,7 @@ async def test_worker_sends_mirrors_and_is_idempotent(client, settings):
         assert stats is not None and stats["sent"] == 1
         assert len(sender.calls) == 1
         assert sender.calls[0]["whatsapp_id"] == wa
-        assert sender.calls[0]["text"] == "Приходите завтра"
+        assert sender.calls[0]["text"] == "See you tomorrow"
 
         row = await _outbox_row(factory, wa)
         assert row is not None
@@ -228,8 +228,8 @@ async def test_worker_sends_mirrors_and_is_idempotent(client, settings):
             )
             assert mirrored["direction"] == "out"
             assert mirrored["message_type"] == "manager"
-            assert mirrored["content"] == "Приходите завтра"
-            assert mirrored["stage_at_moment"] == "НОВЫЙ_ЛИД"
+            assert mirrored["content"] == "See you tomorrow"
+            assert mirrored["stage_at_moment"] == "NEW_INQUIRY"
             assert mirrored["tokens_used"] == 0
 
         # A repeated run must not resend (idempotent by outbox_id).
@@ -259,7 +259,7 @@ async def test_worker_retries_then_succeeds(client, settings):
         token = await admin_csrf(client, settings)
         await _insert_lead(factory, wa)
         queued = await client.post(
-            f"/api/chats/{wa}/messages", json={"body": "Ждём вас"}, headers=csrf_headers(token)
+            f"/api/chats/{wa}/messages", json={"body": "See you"}, headers=csrf_headers(token)
         )
         assert queued.status_code == 202
 
@@ -295,7 +295,7 @@ async def test_worker_fails_after_five_attempts_and_notifies(client, settings):
         await _insert_lead(factory, wa)
         queued = await client.post(
             f"/api/chats/{wa}/messages",
-            json={"body": "Не дойдёт"},
+            json={"body": "Will not arrive"},
             headers=csrf_headers(admin["csrf"]),
         )
         assert queued.status_code == 202
@@ -398,7 +398,7 @@ async def test_autopause_disabled_via_setting(client, settings):
         try:
             response = await client.post(
                 f"/api/chats/{wa}/messages",
-                json={"body": "Без паузы"},
+                json={"body": "No pause"},
                 headers=csrf_headers(token),
             )
             assert response.status_code == 202
@@ -430,7 +430,7 @@ async def test_retry_endpoint(client, settings):
         token = await admin_csrf(client, settings)
         await _insert_lead(factory, wa)
         queued = await client.post(
-            f"/api/chats/{wa}/messages", json={"body": "Повтор"}, headers=csrf_headers(token)
+            f"/api/chats/{wa}/messages", json={"body": "Retry"}, headers=csrf_headers(token)
         )
         outbox_id = queued.json()["id"]
         async with factory() as session:
@@ -467,7 +467,7 @@ async def test_outbox_listing_and_quick_replies(client, settings):
     try:
         token = await admin_csrf(client, settings)
         await _insert_lead(factory, wa)
-        for text_body in ("Раз", "Два"):
+        for text_body in ("One", "Two"):
             response = await client.post(
                 f"/api/chats/{wa}/messages",
                 json={"body": text_body},
@@ -477,7 +477,7 @@ async def test_outbox_listing_and_quick_replies(client, settings):
         listing = await client.get(f"/api/chats/{wa}/outbox?limit=10")
         assert listing.status_code == 200
         assert listing.json()["total"] == 2
-        assert [item["body"] for item in listing.json()["items"]] == ["Два", "Раз"]
+        assert [item["body"] for item in listing.json()["items"]] == ["Two", "One"]
 
         replies = await client.get("/api/chats/quick-replies")
         assert replies.status_code == 200
@@ -541,7 +541,7 @@ async def test_post_to_n8n_uses_mock_server():
             settings,
             outbox_id=uuid.uuid4(),
             whatsapp_id="79990000001@c.us",
-            text="Привет",
+            text="Hi",
         )
         assert payload["provider_message_id"] == "mock-pv-1"
         await asyncio.to_thread(server.shutdown)
@@ -549,7 +549,7 @@ async def test_post_to_n8n_uses_mock_server():
         call = _MockN8nHandler.received[0]
         assert call["secret"] == "s3cr3t"
         assert call["body"]["whatsapp_id"] == "79990000001@c.us"
-        assert call["body"]["text"] == "Привет"
+        assert call["body"]["text"] == "Hi"
         assert "outbox_id" in call["body"]
     finally:
         server.server_close()
@@ -610,7 +610,7 @@ async def test_manager_send_flow_end_to_end(client, app, settings):
             assert mgr.client is not None
             queued = await mgr.client.post(
                 f"/api/chats/{wa}/messages",
-                json={"body": "Здравствуйте, Асель!"},
+                json={"body": "Hello, Asel!"},
                 headers=mgr.headers(),
             )
             assert queued.status_code == 202
@@ -637,7 +637,7 @@ async def test_manager_send_flow_end_to_end(client, app, settings):
             if item["data"].get("message_type") == "manager"
         ]
         assert len(manager_msgs) == 1
-        assert manager_msgs[0]["body"] == "Здравствуйте, Асель!"
+        assert manager_msgs[0]["body"] == "Hello, Asel!"
         assert manager_msgs[0]["author_name"] == "Case Manager"
     finally:
         await _purge(factory, wa, [])
@@ -656,7 +656,7 @@ async def test_mirror_failure_keeps_sent_status(client, settings, monkeypatch):
         await _insert_lead(factory, wa)
         queued = await client.post(
             f"/api/chats/{wa}/messages",
-            json={"body": "Дойдёт, но не отразится"},
+            json={"body": "Arrives but is not mirrored"},
             headers=csrf_headers(token),
         )
         assert queued.status_code == 202
@@ -692,7 +692,7 @@ async def test_parallel_cycles_send_only_once(client, settings):
         await _insert_lead(factory, wa)
         queued = await client.post(
             f"/api/chats/{wa}/messages",
-            json={"body": "Только раз"},
+            json={"body": "Only once"},
             headers=csrf_headers(token),
         )
         assert queued.status_code == 202
@@ -738,7 +738,7 @@ async def test_read_timeout_fails_without_retry(client, settings):
         await _insert_lead(factory, wa)
         queued = await client.post(
             f"/api/chats/{wa}/messages",
-            json={"body": "Неоднозначно"},
+            json={"body": "Ambiguous"},
             headers=csrf_headers(token),
         )
         assert queued.status_code == 202
@@ -779,7 +779,7 @@ async def test_stale_sending_reaped_without_redelivery(client, settings):
             await _insert_lead(factory, wa)
             queued = await client.post(
                 f"/api/chats/{wa}/messages",
-                json={"body": "Перехват"},
+                json={"body": "Takeover"},
                 headers=csrf_headers(token),
             )
             assert queued.status_code == 202
@@ -870,7 +870,7 @@ async def test_chats_respect_manager_scope(client, settings, app):
                 assert (
                     await mgr.client.post(
                         f"/api/chats/{wa}/messages",
-                        json={"body": "чужой лид"},
+                        json={"body": "foreign lead"},
                         headers=mgr.headers(),
                     )
                 ).status_code == 404
@@ -886,7 +886,7 @@ async def test_chats_respect_manager_scope(client, settings, app):
                 assert (
                     await mgr2.client.post(
                         f"/api/chats/{wa}/messages",
-                        json={"body": "свой лид"},
+                        json={"body": "own lead"},
                         headers=mgr2.headers(),
                     )
                 ).status_code == 202
@@ -915,7 +915,7 @@ async def test_retry_only_author_or_admin(client, settings, app):
             assert mgr.client is not None
             queued = await mgr.client.post(
                 f"/api/chats/{wa}/messages",
-                json={"body": "Авторское"},
+                json={"body": "Author message"},
                 headers=mgr.headers(),
             )
             assert queued.status_code == 202

@@ -1817,7 +1817,7 @@ export interface components {
         };
         /** ContactCreate */
         ContactCreate: {
-            /** Whatsapp Id */
+            /** Telegram chat id (historical field name). */
             whatsapp_id?: string | null;
             /** Name */
             name?: string | null;
@@ -1849,7 +1849,7 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Whatsapp Id */
+            /** Telegram chat id (historical field name). */
             whatsapp_id: string | null;
             /** Name */
             name: string | null;
@@ -2163,7 +2163,7 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Whatsapp Id */
+            /** Telegram chat id (historical field name). */
             whatsapp_id: string;
             /** Error */
             error: string | null;
@@ -2450,7 +2450,7 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Whatsapp Id */
+            /** Telegram chat id (historical field name). */
             whatsapp_id: string;
             /** Body */
             body: string;

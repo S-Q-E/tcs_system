@@ -100,7 +100,7 @@ def upgrade() -> None:
         ),
         sa.Column("title", sa.String(255), nullable=False),
         sa.Column("amount", sa.Numeric(14, 2), nullable=True),
-        sa.Column("currency", sa.String(3), nullable=False, server_default="KZT"),
+        sa.Column("currency", sa.String(3), nullable=False, server_default="USD"),
         sa.Column(
             "owner_id",
             postgresql.UUID(as_uuid=True),

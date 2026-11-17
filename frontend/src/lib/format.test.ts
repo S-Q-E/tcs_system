@@ -20,7 +20,7 @@ describe("formatPhone", () => {
     expect(formatPhone("+7 707 966 76 03")).toBe("+7 707 966 76 03");
   });
 
-  it("falls back to the digits of the WhatsApp id", () => {
+  it("falls back to the digits of the Telegram id", () => {
     expect(formatPhone(null, "77079667603@c.us")).toBe("+7 707 966 76 03");
     expect(formatPhone("", "77079667603@c.us")).toBe("+7 707 966 76 03");
   });

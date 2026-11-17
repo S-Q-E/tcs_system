@@ -12,7 +12,7 @@ pytestmark = pytest.mark.usefixtures("db_available")
 WA = "79990000101@c.us"
 
 
-async def _insert_lead(session, whatsapp_id: str = WA, stage: str = "НОВЫЙ_ЛИД") -> None:
+async def _insert_lead(session, whatsapp_id: str = WA, stage: str = "NEW_INQUIRY") -> None:
     await session.execute(
         text(
             "INSERT INTO tcs_leads (whatsapp_id, name, current_stage, status)"
@@ -31,7 +31,7 @@ async def test_update_moves_stage_and_writes_event(tx_session):
         await tx_session.execute(text("SELECT COUNT(*) FROM tcs_followups"))
     ).scalar()
 
-    moved = await update_bot_stage(tx_session, WA, "ЗАПИСЬ", admin_id)
+    moved = await update_bot_stage(tx_session, WA, "VIEWING_SCHEDULED", admin_id)
     assert moved is True
     await tx_session.flush()
 
@@ -48,8 +48,8 @@ async def test_update_moves_stage_and_writes_event(tx_session):
         .mappings()
         .one()
     )
-    assert lead["current_stage"] == "ЗАПИСЬ"
-    assert lead["previous_stage"] == "НОВЫЙ_ЛИД"
+    assert lead["current_stage"] == "VIEWING_SCHEDULED"
+    assert lead["previous_stage"] == "NEW_INQUIRY"
     # Nothing else on the lead row changed.
     assert lead["status"] == "ACTIVE"
     assert lead["name"] == "Bridge Test"
@@ -69,8 +69,8 @@ async def test_update_moves_stage_and_writes_event(tx_session):
     )
     assert len(events) == 1
     assert events[0]["event_type"] == "manual_stage_change"
-    assert events[0]["from_stage"] == "НОВЫЙ_ЛИД"
-    assert events[0]["to_stage"] == "ЗАПИСЬ"
+    assert events[0]["from_stage"] == "NEW_INQUIRY"
+    assert events[0]["to_stage"] == "VIEWING_SCHEDULED"
     assert events[0]["payload"]["user_id"] == str(admin_id)
 
     # Bridge touched nothing else.
@@ -85,12 +85,12 @@ async def test_update_moves_stage_and_writes_event(tx_session):
             text("SELECT current_stage FROM tcs_leads WHERE whatsapp_id = '77010000001@c.us'")
         )
     ).scalar()
-    assert other == "НОВЫЙ_ЛИД"
+    assert other == "NEW_INQUIRY"
 
 
 async def test_noop_when_stage_unchanged(tx_session):
     await _insert_lead(tx_session)
-    moved = await update_bot_stage(tx_session, WA, "НОВЫЙ_ЛИД", uuid.uuid4())
+    moved = await update_bot_stage(tx_session, WA, "NEW_INQUIRY", uuid.uuid4())
     assert moved is False
     count = (
         await tx_session.execute(
@@ -102,4 +102,4 @@ async def test_noop_when_stage_unchanged(tx_session):
 
 async def test_missing_lead_raises(tx_session):
     with pytest.raises(BotLeadNotFoundError):
-        await update_bot_stage(tx_session, "79990000999@c.us", "ЗАПИСЬ", uuid.uuid4())
+        await update_bot_stage(tx_session, "79990000999@c.us", "VIEWING_SCHEDULED", uuid.uuid4())

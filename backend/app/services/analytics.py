@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth_deps import CurrentUser
 from ..errors import ApiError
+from ..models.pipelines import STATUS_HANDOFF
 
 MAX_RANGE_DAYS = 366
 TAG_LIMIT = 50
@@ -793,7 +794,7 @@ async def bot_section(session: AsyncSession, filters: AnalyticsFilters) -> dict:
         .all()
     )
     total = len(cohort)
-    manager_now = sum(1 for r in cohort if r["status"] == "МЕНЕДЖЕР")
+    manager_now = sum(1 for r in cohort if r["status"] == STATUS_HANDOFF)
     was = [r["whatsapp_id"] for r in cohort]
     transferred: set[str] = set()
     if was:
@@ -812,7 +813,9 @@ async def bot_section(session: AsyncSession, filters: AnalyticsFilters) -> dict:
             .scalars()
             .all()
         }
-    handed = sum(1 for r in cohort if r["status"] == "МЕНЕДЖЕР" or r["whatsapp_id"] in transferred)
+    handed = sum(
+        1 for r in cohort if r["status"] == STATUS_HANDOFF or r["whatsapp_id"] in transferred
+    )
     objections = (
         (
             await session.execute(

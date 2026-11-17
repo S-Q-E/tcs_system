@@ -65,7 +65,7 @@ async def test_merge_with_two_different_whatsapp_ids_is_refused_without_changes(
             headers=csrf_headers(token),
         )
         assert refused.status_code == 409, refused.text
-        assert refused.json()["error"]["code"] == "MERGE_WHATSAPP_CONFLICT"
+        assert refused.json()["error"]["code"] == "MERGE_Telegram_CONFLICT"
         assert await _wa_of(factory, winner["id"]) == winner_wa
         assert await _wa_of(factory, loser["id"]) == loser_wa
     finally:

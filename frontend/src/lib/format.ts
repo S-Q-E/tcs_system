@@ -31,17 +31,17 @@ export function formatDate(iso: string | null | undefined): string {
   }).format(new Date(iso));
 }
 
-/** Phone for a card: the contact phone, else the digits of the WhatsApp id. */
+/** Phone for a card: the contact phone, else the digits of the Telegram id. */
 export function formatPhone(
   phone: string | null | undefined,
   whatsappId?: string | null,
 ): string | null {
   const fromPhone = (phone ?? "").replace(/\D/g, "");
-  const rawWhatsapp = (whatsappId ?? "").split("@")[0];
-  const fromWhatsapp = rawWhatsapp.startsWith("tg:")
+  const rawTelegram = (whatsappId ?? "").split("@")[0];
+  const fromTelegram = rawTelegram.startsWith("tg:")
     ? ""
-    : rawWhatsapp.replace(/\D/g, "");
-  const digits = fromPhone || fromWhatsapp;
+    : rawTelegram.replace(/\D/g, "");
+  const digits = fromPhone || fromTelegram;
   if (!digits) {
     return null;
   }

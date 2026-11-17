@@ -4,40 +4,36 @@ import uuid
 
 from sqlalchemy import text
 
-DEFAULT_PIPELINE_NAME = "Продажи Knewit"
+DEFAULT_PIPELINE_NAME = "TCS Leasing"
 
-# (name, color, kind, bot_stage_key, bot_status_key) in funnel order.
-# bot_stage_key values come from docs/db_schema.md (tcs_leads.current_stage).
+# Exactly six stages; all of them are board columns, including won/lost.
+# (name, color, kind, bot_stage_key, bot_status_key) in board order.
+# Meaning for the bot:
+#   NEW_INQUIRY       - only the first message
+#   QUALIFIED         - bedrooms or unit known AND move-in date or budget known
+#   VIEWING_SCHEDULED - a viewing is booked (trial_datetime is set)
+#   VIEWING_DONE      - the viewing happened (a manager moves the card)
+#   LEASED / LOST     - terminal, matched by the lead status
 STAGES: tuple[tuple[str, str, str, str | None, str | None], ...] = (
-    ("Новый лид", "#38BDF8", "open", "НОВЫЙ_ЛИД", None),
-    ("Выявление потребности", "#818CF8", "open", "ВЫЯВЛЕНИЕ_ПОТРЕБНОСТИ", None),
-    ("Квалификация", "#A78BFA", "open", "КВАЛИФИКАЦИЯ", None),
-    ("Формирование потребности", "#C084FC", "open", "ФОРМИРОВАНИЕ_ПОТРЕБНОСТИ", None),
-    ("Презентация решения", "#E879F9", "open", "ПРЕЗЕНТАЦИЯ_РЕШЕНИЯ", None),
-    ("Целевое действие", "#F472B6", "open", "ЦЕЛЕВОЕ_ДЕЙСТВИЕ", None),
-    ("Работа с возражениями", "#FB7185", "open", "РАБОТА_С_ВОЗРАЖЕНИЕМ", None),
-    ("Запись", "#FBBF24", "open", "ЗАПИСЬ", None),
-    ("Подтверждение", "#FDE047", "open", "ПОДТВЕРЖДЕНИЕ", None),
-    ("Напоминание", "#A3E635", "open", "НАПОМИНАНИЕ", None),
-    ("После пробного", "#34D399", "open", "ПОСЛЕ_ПРОБНОГО", None),
-    ("Сомнения после пробного", "#FB923C", "open", "СОМНЕНИЯ_ПОСЛЕ_ПРОБНОГО", None),
-    ("Думает (follow-up)", "#94A3B8", "open", "ДУМАЕТ_FOLLOWUP", None),
-    ("Продажа", "#22C55E", "open", "ПРОДАЖА", None),
-    ("Клиент", "#16A34A", "won", None, "КЛИЕНТ"),
-    ("Отказ", "#EF4444", "lost", None, "ОТКАЗ"),
+    ("New inquiry", "#38BDF8", "open", "NEW_INQUIRY", None),
+    ("Qualified", "#818CF8", "open", "QUALIFIED", None),
+    ("Viewing scheduled", "#FBBF24", "open", "VIEWING_SCHEDULED", None),
+    ("Viewing done", "#34D399", "open", "VIEWING_DONE", None),
+    ("Leased", "#16A34A", "won", None, "LEASED"),
+    ("Lost", "#EF4444", "lost", None, "LOST"),
 )
 
 LOST_REASONS: tuple[str, ...] = (
-    "Дорого",
-    "Не подошло время",
-    "Выбрал другого",
-    "Не отвечает",
-    "Другое",
+    "Price too high",
+    "Found another place",
+    "Not responding",
+    "Bad timing",
+    "Other",
 )
 
 
 def seed_default_funnel(conn) -> uuid.UUID:
-    """Insert the default pipeline, stages, and lost reasons if missing.
+    """Insert the single default pipeline, its stages, and lost reasons if missing.
 
     Idempotent: existing rows (matched by name) are left untouched.
     Works with any sync SQLAlchemy connection (Alembic migrations, run_sync).

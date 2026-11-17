@@ -23,12 +23,13 @@ in its own `crm_*` tables and never migrates bot tables.
 
 ```bash
 docker compose up -d                       # local Postgres 16 + bot fixtures
-pip install -r requirements-dev.txt        # or use the existing .venv
-alembic -c backend/alembic.ini upgrade head
+# Python 3.12 environment; the demo keeps its venv outside the repository
+python3 -m venv ../.venv && ../.venv/bin/pip install -r requirements-dev.txt
+../.venv/bin/alembic -c backend/alembic.ini upgrade head
 DEMO_DB_CONFIRM=I_UNDERSTAND_THIS_IS_A_DEMO_DB \
   DATABASE_URL=postgresql://tcs:tcs@localhost:5432/tcs \
-  python scripts/seed_tcs_demo.py
-uvicorn backend.app.main:app --reload --port 8000
+  ../.venv/bin/python scripts/seed_tcs_demo.py
+../.venv/bin/uvicorn backend.app.main:app --reload --port 8000
 ```
 
 Open http://localhost:8000 and log in with `ADMIN_EMAIL` / `ADMIN_PASSWORD`
@@ -52,21 +53,25 @@ cd frontend && npm ci && npm run dev
 
 ## Demo data
 
-`scripts/seed_tcs_demo.py` creates the **TCS Leasing** pipeline (single
-default), 14 units in `tcs_units` (2 leased) and 30 fictional leads over
-30 days: 121 messages, 12 viewings (6 done, 2 no-shows, 1 cancelled, 3 in the
-next 2–5 days), one unanswered dialog (last incoming ~30 minutes ago, bot
-live), two leads handed to a manager, ~40% of first messages outside
-Mon–Fri 09:00–17:00 ET.
+Alembic seeds the single **TCS Leasing** pipeline with six stages
+(New inquiry, Qualified, Viewing scheduled, Viewing done, Leased, Lost).
+`scripts/seed_tcs_demo.py` fills 14 units in `tcs_units` (2 leased) and 30
+fictional leads over 30 days (NEW_INQUIRY 4, QUALIFIED 6, VIEWING_SCHEDULED 4,
+VIEWING_DONE 8, LEASED 3, LOST 5): 121 messages, 8 past viewings plus 4 in the
+next 2–5 days, 2 no-shows and 1 cancellation back in Qualified, one unanswered
+dialog in New inquiry (last incoming ~30 minutes ago, bot live), two leads in
+`HANDOFF`, ~40% of first messages outside Mon–Fri 09:00–17:00 ET.
 
 - Every demo row is marked `source = 'demo'`; telephones are `555-01xx`.
 - The script refuses to run without
   `DEMO_DB_CONFIRM=I_UNDERSTAND_THIS_IS_A_DEMO_DB` and refuses if `tcs_leads`
-  already contains `source = 'whatsapp'` (looks like a production bot DB).
+  already contains `source = 'telegram'` (looks like a production bot DB).
 - `--reset` deletes only `source = 'demo'` rows and their messages/events
   (never `TRUNCATE`). Re-run `--reset` + the seed right before a presentation.
-- The legacy funnel «Продажи Knewit» stays in the database but is not default
-  and is never opened during the demo (see `DEMO_SCRIPT.md`).
+- Lead statuses are `ACTIVE`, `VIEWING_BOOKED`, `THINKING`, `HANDOFF`,
+  `LEASED`, `LOST`.
+- `whatsapp_id` is a historical column name: it stores the chat identifier
+  (`tg:<chat_id>`), not a phone number.
 
 ## Migrations
 
@@ -157,4 +162,3 @@ python scripts/validate_workflow.py         # generated n8n workflows
 - `docs/DECISIONS.md` — architecture decisions (D41–D42 cover the demo).
 - `docs/db_schema.md` — `tcs_*` reference.
 - `docs/tcs/` — bot prompt, tool specs, improvement plan, Railway deploy guide.
-- `docs/PROGRESS.md` — step log.

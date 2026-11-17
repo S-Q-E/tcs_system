@@ -6,7 +6,7 @@ _DIGITS = re.compile(r"\D+")
 
 
 def normalize_phone(value: str | None) -> str:
-    """Normalize phone/whatsapp to digits.
+    """Normalize phone/telegram to digits.
 
     - strips non-digits, drops `@c.us` / `@lid` style suffixes implicitly
     - converts leading 8 -> 7 for 11-digit KZ/RU numbers
@@ -20,7 +20,7 @@ def normalize_phone(value: str | None) -> str:
     return digits
 
 
-def normalize_whatsapp(value: str | None) -> str:
+def normalize_telegram(value: str | None) -> str:
     """whatsapp_id like `79991234567@c.us` -> normalized digits.
 
     Telegram leads use ``tg:<chat_id>``; those ids are not phone numbers and
@@ -49,9 +49,9 @@ def contact_keys(
     phone: str | None, whatsapp_id: str | None, email: str | None
 ) -> dict[str, str | None]:
     """Grouping keys used for duplicate detection."""
-    from_wa = normalize_whatsapp(whatsapp_id)
+    from_wa = normalize_telegram(whatsapp_id)
     from_phone = normalize_phone(phone)
-    # whatsapp digits and phone digits live in the same space; prefer the longest.
+    # telegram digits and phone digits live in the same space; prefer the longest.
     merged_phone: str | None = None
     candidates = [d for d in (from_phone, from_wa) if len(d) >= 7]
     if candidates:

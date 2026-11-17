@@ -123,7 +123,7 @@ def test_deploy_doc_covers_production_checklist():
         "GRANT SELECT ON tcs_",
         "UPDATE (current_stage, previous_stage, updated_at)",
         "permission denied",
-        "Откат",
+        "Rollback",
         "expand",
         "contract",
         "BACKUP.md",

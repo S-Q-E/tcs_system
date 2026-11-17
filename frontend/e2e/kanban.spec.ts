@@ -7,8 +7,8 @@ test("kanban drag persists after reload", async ({ page }) => {
   // 1. Login through the UI.
   await page.goto("/login");
   await page.getByLabel("Email").fill(ADMIN_EMAIL);
-  await page.getByLabel("Пароль").fill(ADMIN_PASSWORD);
-  await page.getByRole("button", { name: "Войти" }).click();
+  await page.getByLabel("Password").fill(ADMIN_PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL("**/deals");
 
   const columns = page.getByRole("region", { name: /./ });
@@ -26,7 +26,7 @@ test("kanban drag persists after reload", async ({ page }) => {
   expect(title.length).toBeGreaterThan(0);
 
   // 2. Drag the card into the next column (grab the drag handle).
-  const handle = card.getByTitle(/Перетащить/);
+  const handle = card.getByTitle(/Drag/);
   const from = await handle.boundingBox();
   const to = await target.boundingBox();
   if (!from || !to) {

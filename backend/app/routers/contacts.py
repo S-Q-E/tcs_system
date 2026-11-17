@@ -164,7 +164,7 @@ async def create_contact(
         await session.commit()
     except IntegrityError as exc:
         await session.rollback()
-        raise ApiError("WHATSAPP_TAKEN", "Contact with this whatsapp_id exists", 409) from exc
+        raise ApiError("Telegram_TAKEN", "Contact with this whatsapp_id exists", 409) from exc
     await session.refresh(contact)
     await log_activity(
         session,

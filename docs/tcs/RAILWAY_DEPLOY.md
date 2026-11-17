@@ -34,26 +34,23 @@ All data is fictional. Never point this project at a production database.
 
 ## 2. Prepare the demo database (one-time, from your machine)
 
-The image runs `alembic upgrade head` on every boot. Migration `0015`
-backfills from `tcs_messages` **without an existence guard**, so on an empty
-database the bot schema must exist first. Run exactly this order:
+The image runs `alembic upgrade head` on every boot. The tcs_* backfills are
+guarded, so migrations also succeed on a brand-new database; the seed applies
+the bot schema when it is missing. Run exactly this order:
 
 ```bash
 cd tcs_demo
 export RAILWAY_DB='postgresql://...:...@...:..../railway?sslmode=require'
 
-# 1) bot schema (tcs_leads, tcs_messages, tcs_events, tcs_followups, ...)
-psql "$RAILWAY_DB" -f tests/fixtures/tcs_schema.sql
-
-# 2) CRM tables
+# 1) CRM tables + the single six-stage TCS Leasing pipeline
 DATABASE_URL="$RAILWAY_DB" alembic -c backend/alembic.ini upgrade head
 
-# 3) TCS funnel + fictional demo data (guardrails apply)
+# 2) fictional demo data (also applies the bot schema if missing)
 DEMO_DB_CONFIRM=I_UNDERSTAND_THIS_IS_A_DEMO_DB \
 DATABASE_URL="$RAILWAY_DB" python scripts/seed_tcs_demo.py
 
-# 4) n8n dedupe table for CRM → Telegram sends (SQL from docs/n8n/README.md,
-#    section «Дедупликация»)
+# 3) n8n dedupe table for CRM → Telegram sends (SQL from docs/n8n/README.md,
+#    'Dedupe table' section)
 psql "$RAILWAY_DB" -c "CREATE TABLE IF NOT EXISTS n8n_processed_outbox (
   outbox_id uuid PRIMARY KEY,
   provider_message_id text,
@@ -74,8 +71,7 @@ dialog after the sync worker runs.
 > locally with the service variables injected. The seed script exists in the
 > image (`scripts/seed_tcs_demo.py`), so
 > `railway run env DEMO_DB_CONFIRM=... python scripts/seed_tcs_demo.py` also
-> works after the first successful boot. The manual order above is simpler for
-> the first deployment.
+> works after the first successful boot.
 
 ## 3. Create the CRM web service
 
@@ -174,7 +170,6 @@ Wait 15 seconds (sync worker), then follow `DEMO_SCRIPT.md` → «Before the dem
 
 | Symptom | Cause / fix |
 |---|---|
-| Boot fails on `0015_dialogs_list` (`tcs_messages` missing) | Apply `tests/fixtures/tcs_schema.sql` before migrations (step 2). |
 | Login loops back to `/login` | `COOKIE_SECURE=true` over plain HTTP; use the generated HTTPS domain or set `false` locally. |
 | 401 on every n8n webhook call | `N8N_WEBHOOK_SECRET` differs between the CRM and n8n env. |
 | Bot silent | Workflow inactive, Telegram credential wrong, or the dialog is paused (`crm_conversation_state.bot_paused`). |

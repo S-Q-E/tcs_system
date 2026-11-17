@@ -28,7 +28,7 @@ async def apply_deal_stage(
     session: AsyncSession,
     deal: CrmDeal,
     target: CrmStage,
-    contact_whatsapp: str | None,
+    contact_telegram: str | None,
     *,
     actor_id: uuid.UUID | None,
     source: str,
@@ -79,10 +79,10 @@ async def apply_deal_stage(
     )
 
     bridged = False
-    if use_bridge and target.bot_stage_key and contact_whatsapp:
+    if use_bridge and target.bot_stage_key and contact_telegram:
         try:
             bridged = await update_bot_stage(
-                session, contact_whatsapp, target.bot_stage_key, actor_id
+                session, contact_telegram, target.bot_stage_key, actor_id
             )
         except BotLeadNotFoundError:
             # Phone numbers never go to logs.

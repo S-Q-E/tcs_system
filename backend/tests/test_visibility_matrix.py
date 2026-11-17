@@ -45,7 +45,7 @@ async def _insert_lead(factory, wa: str) -> None:
         await session.execute(
             text(
                 "INSERT INTO tcs_leads (whatsapp_id, name, current_stage, status)"
-                " VALUES (:wa, 'Scope Bot', 'НОВЫЙ_ЛИД', 'ACTIVE')"
+                " VALUES (:wa, 'Scope Bot', 'NEW_INQUIRY', 'ACTIVE')"
             ),
             {"wa": wa},
         )
@@ -166,14 +166,14 @@ async def test_visibility_matrix_dialogs_and_chats(client, settings, app):
                 assert (
                     await mgr.client.post(
                         f"/api/chats/{wa_own}/messages",
-                        json={"body": "чужой"},
+                        json={"body": "foreign"},
                         headers=mgr.headers(),
                     )
                 ).status_code == 404
                 assert (
                     await mgr.client.post(
                         f"/api/chats/{wa_free}/messages",
-                        json={"body": "свободный"},
+                        json={"body": "free"},
                         headers=mgr.headers(),
                     )
                 ).status_code == 202
@@ -334,12 +334,12 @@ async def test_visibility_matrix_exports_notes_and_import_status(client, setting
                 assert listed.json()["total"] == 0
                 assert (await mgr.client.get(f"/api/notes/{note_id}")).status_code == 404
                 edited = await mgr.client.patch(
-                    f"/api/notes/{deal_note_id}", json={"body": "чужая"}, headers=mgr.headers()
+                    f"/api/notes/{deal_note_id}", json={"body": "foreign"}, headers=mgr.headers()
                 )
                 assert edited.status_code == 404
                 created = await mgr.client.post(
                     "/api/notes",
-                    json={"contact_id": own_contact["id"], "body": "в чужой контакт"},
+                    json={"contact_id": own_contact["id"], "body": "into a foreign contact"},
                     headers=mgr.headers(),
                 )
                 assert created.status_code == 422, created.text

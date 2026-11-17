@@ -47,7 +47,7 @@ def _wa(prefix: str) -> str:
 
 
 async def _first_open_stage_id(factory):
-    """Stage id sync_worker treats as «Новые лиды» for the default pipeline."""
+    """Stage id sync_worker treats as the first open stage for the default pipeline."""
     async with factory() as session:
         return (
             await session.execute(
@@ -108,7 +108,7 @@ async def test_sync_new_deal_lands_on_top(settings):
             await session.execute(
                 text(
                     "INSERT INTO tcs_leads (whatsapp_id, name, current_stage, status)"
-                    " VALUES (:wa, 'Top Test', 'НОВЫЙ_ЛИД', 'ACTIVE')"
+                    " VALUES (:wa, 'Top Test', 'NEW_INQUIRY', 'ACTIVE')"
                 ),
                 {"wa": wa},
             )
@@ -148,7 +148,7 @@ async def test_sync_batch_keeps_creation_order(settings):
                 await session.execute(
                     text(
                         "INSERT INTO tcs_leads (whatsapp_id, name, current_stage, status)"
-                        " VALUES (:wa, :name, 'НОВЫЙ_ЛИД', 'ACTIVE')"
+                        " VALUES (:wa, :name, 'NEW_INQUIRY', 'ACTIVE')"
                     ),
                     {"wa": wa, "name": f"Batch {n}"},
                 )

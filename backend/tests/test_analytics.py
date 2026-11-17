@@ -39,9 +39,9 @@ def _dt(value: str) -> datetime:
 async def _seed_fixed_dataset(client, factory, token: str, pipeline: dict) -> dict:
     """Fixed analytics fixture. All bot timestamps are UTC (= ALM - 6h)."""
     stages = pipeline["stages"]
-    s1 = next(s for s in stages if s["name"] == "Новый лид")
-    s2 = next(s for s in stages if s["name"] == "Выявление потребности")
-    assert s1["bot_stage_key"] == "НОВЫЙ_ЛИД"
+    s1 = next(s for s in stages if s["name"] == "New inquiry")
+    s2 = next(s for s in stages if s["name"] == "Qualified")
+    assert s1["bot_stage_key"] == "NEW_INQUIRY"
 
     manager_a = await make_manager(client, token)
     manager_b = await make_manager(client, token)
@@ -63,9 +63,9 @@ async def _seed_fixed_dataset(client, factory, token: str, pipeline: dict) -> di
     ).json()
 
     specs = [
-        ("whatsapp", uid_a, 100000),
+        ("telegram", uid_a, 100000),
         ("instagram", uid_a, None),
-        ("whatsapp", uid_b, 50000),
+        ("telegram", uid_b, 50000),
         ("manual", uid_a, None),
     ]
     contacts, deals, was = [], [], []
@@ -190,10 +190,10 @@ async def _seed_fixed_dataset(client, factory, token: str, pipeline: dict) -> di
             {"at": _dt("2026-02-15 05:00"), "id": t1["id"]},
         )
         for wa, stage, status, objection, created in (
-            (wa1, "ПРОДАЖА", "КЛИЕНТ", "Дорого", _dt("2026-02-11 03:00")),
-            (wa2, "НОВЫЙ_ЛИД", "ACTIVE", None, _dt("2026-02-11 05:00")),
-            (wa3, "РАБОТА_С_ВОЗРАЖЕНИЕМ", "МЕНЕДЖЕР", "Дорого", _dt("2026-02-12 01:00")),
-            (wa4, "НОВЫЙ_ЛИД", "ОТКАЗ", "Не отвечает", _dt("2026-02-12 06:00")),
+            (wa1, "VIEWING_DONE", "LEASED", "Too expensive", _dt("2026-02-11 03:00")),
+            (wa2, "NEW_INQUIRY", "ACTIVE", None, _dt("2026-02-11 05:00")),
+            (wa3, "QUALIFIED", "HANDOFF", "Too expensive", _dt("2026-02-12 01:00")),
+            (wa4, "NEW_INQUIRY", "LOST", "Not responding", _dt("2026-02-12 06:00")),
         ):
             await session.execute(
                 text(
@@ -225,8 +225,8 @@ async def _seed_fixed_dataset(client, factory, token: str, pipeline: dict) -> di
             text(
                 "INSERT INTO tcs_events"
                 " (whatsapp_id, event_type, from_stage, to_stage, created_at)"
-                " VALUES (:wa, 'transferred_to_manager', 'РАБОТА_С_ВОЗРАЖЕНИЕМ',"
-                " 'МЕНЕДЖЕР', '2026-02-12 01:05+00')"
+                " VALUES (:wa, 'transferred_to_manager', 'QUALIFIED',"
+                " 'HANDOFF', '2026-02-12 01:05+00')"
             ),
             {"wa": wa3},
         )
@@ -270,12 +270,12 @@ async def test_overview_matches_hand_computed_values(client, settings):
         funnel = data["funnel"]
         assert funnel["cohort_deals"] == 4
         by_name = {s["name"]: s for s in funnel["stages"]}
-        assert by_name["Новый лид"]["reached"] == 3
-        assert by_name["Выявление потребности"]["reached"] == 3
-        assert by_name["Выявление потребности"]["conversion_from_prev"] == 1.0
-        assert by_name["Новый лид"]["conversion_from_prev"] is None
-        assert by_name["Новый лид"]["avg_hours_on_stage"] == 24.0
-        assert by_name["Выявление потребности"]["is_bottleneck"] is True
+        assert by_name["New inquiry"]["reached"] == 3
+        assert by_name["Qualified"]["reached"] == 3
+        assert by_name["Qualified"]["conversion_from_prev"] == 1.0
+        assert by_name["New inquiry"]["conversion_from_prev"] is None
+        assert by_name["New inquiry"]["avg_hours_on_stage"] == 24.0
+        assert by_name["Qualified"]["is_bottleneck"] is True
         assert funnel["total_entered"] == 3
         assert funnel["total_finished"] == 1
         assert funnel["overall_conversion"] == pytest.approx(1 / 3, abs=0.001)
@@ -331,13 +331,13 @@ async def test_overview_matches_hand_computed_values(client, settings):
         # 09:00 in the test timezone (UTC) -> all are after-hours.
         assert bot["after_hours_leads"] == 4
         assert bot["after_hours_share"] == 1.0
-        assert bot["top_objections"][0] == {"objection": "Дорого", "count": 2}
+        assert bot["top_objections"][0] == {"objection": "Too expensive", "count": 2}
         assert sum(r["count"] for r in bot["abandoned_by_stage"]) == 4
 
         sources = {s["source"]: s for s in data["sources"]}
-        assert sources["whatsapp"]["contacts"] == 2
-        assert sources["whatsapp"]["won"] == 1
-        assert sources["whatsapp"]["won_sum"] == 100000.0
+        assert sources["telegram"]["contacts"] == 2
+        assert sources["telegram"]["won"] == 1
+        assert sources["telegram"]["won_sum"] == 100000.0
         assert sources["instagram"]["contacts"] == 1
         tags = {t["tag"]: t for t in data["tags"]}
         assert tags[seed["tag"]["name"]]["deals"] == 2
@@ -491,11 +491,11 @@ async def test_validation_auth_and_export(client, settings, app):
             assert "text/csv" in export.headers["content-type"]
             body = export.text
             assert "stage_id" in body.splitlines()[0]
-            assert "Новый лид" in body
+            assert "New inquiry" in body
             dyn = await client.get(f"/api/analytics/export?section=dynamics&{_q(PERIOD)}")
             assert len(dyn.text.splitlines()) == 12  # header + 11 day buckets
 
-            # Restriction forces managers onto their own scope (404 for чужое).
+            # Restriction forces managers onto their own scope (404 for foreign).
             manager = await make_manager(client, token)
             async with factory() as session:
                 await session.execute(

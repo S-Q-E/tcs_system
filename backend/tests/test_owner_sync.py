@@ -74,7 +74,7 @@ async def _insert_lead(factory, wa: str) -> None:
         await session.execute(
             text(
                 "INSERT INTO tcs_leads (whatsapp_id, name, current_stage, status)"
-                " VALUES (:wa, 'Owner Bot', 'НОВЫЙ_ЛИД', 'ACTIVE')"
+                " VALUES (:wa, 'Owner Bot', 'NEW_INQUIRY', 'ACTIVE')"
             ),
             {"wa": wa},
         )

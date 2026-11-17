@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
-// Этап A мобильной адаптации: проверки в телефонном вьюпорте.
-// Десктопные спеки рядом не трогаем; этот файл гоняется той же командой `npm run e2e`.
+// Mobile adaptation: checks in a phone viewport.
+// Desktop specs are separate; this file runs with the same `npm run e2e` command.
 test.use({
   viewport: { width: 375, height: 667 },
   hasTouch: true,
@@ -14,8 +14,8 @@ const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? "mobile-test-password-1
 async function login(page: Page) {
   await page.goto("/login");
   await page.getByLabel("Email").fill(ADMIN_EMAIL);
-  await page.getByLabel("Пароль").fill(ADMIN_PASSWORD);
-  await page.getByRole("button", { name: "Войти" }).click();
+  await page.getByLabel("Password").fill(ADMIN_PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL("**/deals");
 }
 
@@ -28,7 +28,7 @@ async function expectNoPageOverflow(page: Page, where: string) {
 
 test("mobile: login has no horizontal overflow", async ({ page }) => {
   await page.goto("/login");
-  await expect(page.getByRole("button", { name: "Войти" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
   await expectNoPageOverflow(page, "/login");
 });
 
@@ -39,29 +39,29 @@ test("mobile: main screens have no horizontal overflow", async ({ page }) => {
     await expect(page.locator("main")).toBeVisible();
     await expectNoPageOverflow(page, path);
   }
-  // Нижний таб-бар виден, боковой панели нет.
-  await expect(page.getByRole("navigation", { name: "Основная навигация" })).toBeVisible();
+  // The bottom tab bar is visible, the sidebar is not.
+  await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
 });
 
 test("mobile: dialogs list -> chat -> back", async ({ page }) => {
   await login(page);
   await page.goto("/dialogs");
 
-  const rows = page.locator("aside button", { hasText: /бот (на паузе|отвечает)/ });
+  const rows = page.locator("aside button", { hasText: /(Bot paused|Bot replying)/ });
   await expect(rows.first()).toBeVisible({ timeout: 15_000 });
 
-  // В списке чат скрыт, виден только список.
-  await expect(page.getByLabel("Сообщение клиенту")).toBeHidden();
+  // In the list view the chat is hidden; only the list is visible.
+  await expect(page.getByLabel("Message to prospect")).toBeHidden();
 
   await rows.first().click();
   await expect(page).toHaveURL(/wa=/);
 
-  // В чате список скрыт, есть кнопка «Назад», композер и «Отправить» видны.
-  const back = page.getByRole("button", { name: "Назад к списку" });
+  // In the chat the list is hidden; Back, the composer and Send are visible.
+  const back = page.getByRole("button", { name: "Back to list" });
   await expect(back).toBeVisible();
-  const composer = page.getByLabel("Сообщение клиенту");
+  const composer = page.getByLabel("Message to prospect");
   await expect(composer).toBeVisible();
-  const send = page.getByRole("button", { name: "Отправить" });
+  const send = page.getByRole("button", { name: "Send" });
   await expect(send).toBeVisible();
   const box = await send.boundingBox();
   expect(box).not.toBeNull();

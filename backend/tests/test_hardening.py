@@ -275,7 +275,7 @@ async def test_audit_import_finished(client, settings):
     contact_ids: list[str] = []
     try:
         token = await admin_csrf(client, settings)
-        csv_text = "full_name,phone_number\nИмпорт,+77019998877\n"
+        csv_text = "full_name,phone_number\nImport,+77019998877\n"
         mapping = {"full_name": "name", "phone_number": "phone"}
         job_resp = await client.post(
             "/api/contacts/import",
@@ -312,7 +312,7 @@ async def test_malicious_message_content_round_trips_as_text(client, settings):
             await session.execute(
                 text(
                     "INSERT INTO tcs_leads (whatsapp_id, name, current_stage, status)"
-                    " VALUES (:wa, 'XSS Probe', 'НОВЫЙ_ЛИД', 'ACTIVE')"
+                    " VALUES (:wa, 'XSS Probe', 'NEW_INQUIRY', 'ACTIVE')"
                 ),
                 {"wa": wa},
             )

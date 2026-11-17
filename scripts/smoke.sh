@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Post-deploy smoke check (Step 15, see docs/DEPLOY.md).
 # Verifies: /api/health, login, deals list, SSE stream, and (opt-in) one
-# test WhatsApp message via the outbox queue.
+# test Telegram message via the outbox queue.
 #
 # All inputs come from the environment; nothing secret is printed.
 #   BASE_URL="https://crm-staging.up.railway.app" \
@@ -76,10 +76,10 @@ pass "/api/stream prologue received"
 # 5. Opt-in send path: queue one message to a TEST chat (HTTP 202).
 if [ "$SEND_TEST_MESSAGE" = "1" ]; then
   [ -n "$TEST_WHATSAPP_ID" ] || fail "SEND_TEST_MESSAGE=1 needs TEST_WHATSAPP_ID"
-  printf '{"body":"Smoke-проверка CRM (автотест деплоя)"}' > "$WORKDIR/msg.json"
+  printf '{"body":"CRM smoke check (deploy autotest)"}' > "$WORKDIR/msg.json"
   code="$(curl -s -b "$JAR" -o "$BODY" -w '%{http_code}' -X POST "$BASE_URL/api/chats/$TEST_WHATSAPP_ID/messages" -H 'Content-Type: application/json' -H "X-CSRF-Token: $CSRF" --data-binary "@$WORKDIR/msg.json")"
   [ "$code" = "202" ] || fail "send -> HTTP $code: $(head -c 200 "$BODY")"
-  pass "test message queued 202 to $TEST_WHATSAPP_ID (check it in WhatsApp)"
+  pass "test message queued 202 to $TEST_WHATSAPP_ID (check it in Telegram)"
 else
   echo "skip: send path (set SEND_TEST_MESSAGE=1 TEST_WHATSAPP_ID=... to enable)"
 fi

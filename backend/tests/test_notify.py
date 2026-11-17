@@ -26,7 +26,7 @@ async def _insert_lead(factory, wa: str, status: str = "ACTIVE") -> None:
         await session.execute(
             text(
                 "INSERT INTO tcs_leads (whatsapp_id, name, current_stage, status)"
-                " VALUES (:wa, 'Notify Bot', 'НОВЫЙ_ЛИД', :status)"
+                " VALUES (:wa, 'Notify Bot', 'NEW_INQUIRY', :status)"
             ),
             {"wa": wa, "status": status},
         )
@@ -80,7 +80,7 @@ async def test_handover_notifies_without_task(client, settings):
     try:
         token = await admin_csrf(client, settings)
         owner = await make_manager(client, token)
-        await _insert_lead(factory, wa, "МЕНЕДЖЕР")
+        await _insert_lead(factory, wa, "HANDOFF")
         # Owner is unknown before sync; assign after backfill, then resync.
         await run_sync(factory)
         async with factory() as session:
@@ -179,7 +179,7 @@ async def test_handover_once_per_deal_after_task_done_and_read(client, settings)
     try:
         token = await admin_csrf(client, settings)
         owner = await make_manager(client, token)
-        await _insert_lead(factory, wa, "МЕНЕДЖЕР")
+        await _insert_lead(factory, wa, "HANDOFF")
         await run_sync(factory)
         deal_id = await _deal_id(factory, wa)
         async with factory() as session:
@@ -231,7 +231,7 @@ async def test_autopause_opt_in(client, settings):
     wa = _wa()
     try:
         await admin_csrf(client, settings)
-        await _insert_lead(factory, wa, "МЕНЕДЖЕР")
+        await _insert_lead(factory, wa, "HANDOFF")
         async with factory() as session:
             await session.execute(
                 text(
@@ -288,7 +288,7 @@ async def test_locked_stage_notifies_owner(client, settings):
             )
             await session.execute(
                 text(
-                    "UPDATE tcs_leads SET current_stage = 'ЗАПИСЬ', updated_at = now()"
+                    "UPDATE tcs_leads SET current_stage = 'VIEWING_SCHEDULED', updated_at = now()"
                     " WHERE whatsapp_id = :wa"
                 ),
                 {"wa": wa},
@@ -424,7 +424,7 @@ async def test_bot_stage_blocked_logged_once_per_target(client, settings):
             )
             await session.execute(
                 text(
-                    "UPDATE tcs_leads SET current_stage = 'ЗАПИСЬ', updated_at = now()"
+                    "UPDATE tcs_leads SET current_stage = 'VIEWING_SCHEDULED', updated_at = now()"
                     " WHERE whatsapp_id = :wa"
                 ),
                 {"wa": wa},

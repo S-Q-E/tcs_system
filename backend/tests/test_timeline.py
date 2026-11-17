@@ -27,7 +27,7 @@ async def _seed_bot_history(factory, wa: str) -> None:
         await session.execute(
             text(
                 "INSERT INTO tcs_leads (whatsapp_id, name, current_stage, status)"
-                " VALUES (:wa, 'Timeline Bot', 'НОВЫЙ_ЛИД', 'ACTIVE')"
+                " VALUES (:wa, 'Timeline Bot', 'NEW_INQUIRY', 'ACTIVE')"
             ),
             {"wa": wa},
         )
@@ -41,7 +41,7 @@ async def _seed_bot_history(factory, wa: str) -> None:
         await session.execute(
             text(
                 "INSERT INTO tcs_events (whatsapp_id, event_type, to_stage, payload)"
-                " VALUES (:wa, 'stage_entered', 'НОВЫЙ_ЛИД', '{}')"
+                " VALUES (:wa, 'stage_entered', 'NEW_INQUIRY', '{}')"
             ),
             {"wa": wa},
         )

@@ -119,7 +119,7 @@ WITH cap AS (
   UPDATE tcs_leads
   SET trial_datetime = $2::timestamptz,
       current_stage = 'VIEWING_SCHEDULED',
-      status = 'ЗАПИСАН',
+      status = 'VIEWING_BOOKED',
       direction = COALESCE(NULLIF($3,''), direction),
       goal = COALESCE(NULLIF($4,''), goal),
       lead_data = CASE
@@ -153,7 +153,7 @@ Inputs: `whatsapp_id` (string), `reason` (string, optional).
 ```sql
 WITH upd AS (
   UPDATE tcs_leads
-  SET status = 'МЕНЕДЖЕР', updated_at = now()
+  SET status = 'HANDOFF', updated_at = now()
   WHERE whatsapp_id = $1
   RETURNING whatsapp_id
 ), ev AS (
@@ -171,6 +171,10 @@ the bot does not call the CRM API.
 ## Notes
 
 - `slot_taken` must be handled by the model: apologize and offer other slots.
+- Stage values used by the bot: NEW_INQUIRY (first message), QUALIFIED (bedrooms or
+  unit known AND move-in date or budget known), VIEWING_SCHEDULED (viewing booked),
+  VIEWING_DONE (viewing happened, a manager moves the card). Terminal stages use the
+  lead status: LEASED and LOST.
 - The reminder workflow (W-C) uses `reminder_sent` and joins `tcs_units` on
   `lead_data->>'unit'`; booking stores `building unit_number` there and resets
   `reminder_sent` to false.

@@ -38,7 +38,7 @@ async def test_saved_views_crud_and_visibility(client, settings, app):
             # Private admin view is invisible to the manager.
             others = await mgr.client.get("/api/saved-views?entity=deal")
             assert all(v["id"] != view_id for v in others.json()["items"])
-            # Manager cannot edit чужое.
+            # Manager cannot edit foreign.
             forbidden = await mgr.client.patch(
                 f"/api/saved-views/{view_id}",
                 json={"name": "Hack"},

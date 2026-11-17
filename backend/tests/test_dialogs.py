@@ -25,7 +25,7 @@ async def _insert_lead(factory, wa: str) -> None:
         await session.execute(
             text(
                 "INSERT INTO tcs_leads (whatsapp_id, name, current_stage, status)"
-                " VALUES (:wa, 'Dialog Bot', 'НОВЫЙ_ЛИД', 'ACTIVE')"
+                " VALUES (:wa, 'Dialog Bot', 'NEW_INQUIRY', 'ACTIVE')"
             ),
             {"wa": wa},
         )
@@ -189,7 +189,7 @@ async def test_dialog_messages_returns_newest_window_and_pages_back(client, sett
             await session.execute(
                 text(
                     "INSERT INTO tcs_leads (whatsapp_id, name, current_stage, status)"
-                    " VALUES (:wa, 'Long Bot', 'НОВЫЙ_ЛИД', 'ACTIVE')"
+                    " VALUES (:wa, 'Long Bot', 'NEW_INQUIRY', 'ACTIVE')"
                 ),
                 {"wa": wa},
             )

@@ -1,11 +1,11 @@
 """Board new-on-top: backfill positions in first open stages (see D39).
 
-One-off reorder of the «Новые лиды» column: the first open stage of every
+One-off reorder of the first open column: the first open stage of every
 pipeline (kind='open', minimal sort, tie-break by name) gets
 position = ROW_NUMBER() OVER (PARTITION BY stage_id ORDER BY created_at
 DESC, id) over live deals. Other stages and deals are untouched.
 New cards land on top from now on (min(position)-1 at creation); this
-backfill only aligns the existing «Новые лиды» column, working columns
+backfill only aligns the existing first open column, working columns
 keep their manual order.
 """
 

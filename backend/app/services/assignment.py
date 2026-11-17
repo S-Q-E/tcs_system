@@ -70,7 +70,7 @@ async def pick_assignee(session: AsyncSession) -> uuid.UUID | None:
 async def _sync_state(
     session: AsyncSession, whatsapp_id: str | None, owner_id: uuid.UUID | None
 ) -> None:
-    """Записать ответственного в crm_conversation_state (только для ботовых лидов)."""
+    """Write the owner into crm_conversation_state (bot leads only)."""
     if not whatsapp_id:
         return
     await session.execute(
@@ -85,7 +85,7 @@ async def _sync_state(
 
 
 async def set_deal_owner(session: AsyncSession, deal: CrmDeal, owner_id: uuid.UUID | None) -> None:
-    """Сделка = источник правды. Пишет owner в сделку, контакт и диалог. Без commit."""
+    """The deal is the source of truth. Writes the owner to deal, contact and dialog. No commit."""
     deal.owner_id = owner_id
     contact = await session.get(CrmContact, deal.contact_id)
     if contact is None:
@@ -97,9 +97,9 @@ async def set_deal_owner(session: AsyncSession, deal: CrmDeal, owner_id: uuid.UU
 async def set_contact_owner(
     session: AsyncSession, contact: CrmContact, owner_id: uuid.UUID | None
 ) -> None:
-    """Назначение из контакта/диалога: идёт в самую свежую живую сделку контакта.
+    """Assignment from a contact/dialog goes to the newest live deal of the contact.
 
-    Если у контакта нет живых сделок, пишем только в контакт и диалог.
+    If the contact has no live deals, write only to the contact and the dialog.
     """
     deal = (
         await session.execute(

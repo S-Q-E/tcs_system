@@ -1,7 +1,7 @@
 """Dialogs whose bot pause has lasted longer than the threshold (P3-2).
 
 Only notifications for now: the list filter stays out of scope, and auto-return
-is deferred until the CRM flag is connected to Chatflow (roadmap P0-1″).
+is deferred until the CRM flag is connected to the bot workflow (roadmap P0-1).
 Writes only crm_notifications rows, through services/notifications.notify().
 """
 

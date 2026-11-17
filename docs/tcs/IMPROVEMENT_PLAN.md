@@ -1,7 +1,7 @@
 # TCS demo — improvement plan (post-demo / production)
 
-Source of ideas: the reference workflow
-`docs/tcs/reference-whatsapp-tickets.workflow.json` (WhatsApp + maintenance
+Source of ideas: the reference workflow kept in the author's notes outside
+this repository (chat + maintenance
 tickets + multimodal intake) and the Phase 2–5 notes. Nothing here is part of
 the current demo scope; it is the backlog after the client presentation.
 
@@ -13,7 +13,7 @@ P2 = product growth.
 - [ ] **n8n Error Trigger → admin alert.** One error workflow for all three
   TCS workflows: send the workflow name, failing node, execution id and error
   message to the admin in Telegram (same demo bot or a separate ops bot).
-  The reference workflow already shows this pattern with WhatsApp; port it to
+  The reference workflow already shows this pattern with Telegram; port it to
   Telegram. Reason: right now a broken bot fails silently for the client.
 - [ ] **Heartbeat / dead-man switch.** A tiny workflow every 15 minutes writes
   a timestamp to `crm_settings` (e.g. `n8n_heartbeat`); the CRM shows a banner

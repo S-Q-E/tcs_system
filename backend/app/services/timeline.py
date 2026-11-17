@@ -340,7 +340,7 @@ async def get_contact_timeline(
     limit: int,
     cursor: dict[str, Any] | None,
 ) -> tuple[list[dict[str, Any]], str | None]:
-    """Contact лента: bot messages/events + all deals stages + notes/tasks/activity."""
+    """Contact feed: bot messages/events + all deal stages + notes/tasks/activity."""
     from sqlalchemy import text as _text
 
     per_source = limit + 1

@@ -30,7 +30,7 @@ const ALL_COLUMNS = [
   { id: "name", label: "Name" },
   { id: "phone", label: "Phone" },
   { id: "email", label: "Email" },
-  { id: "whatsapp", label: "Chat" },
+  { id: "telegram", label: "Chat" },
   { id: "owner", label: "Owner" },
   { id: "tags", label: "Tags" },
 ] as const;
@@ -61,7 +61,7 @@ export function autoMapping(header: string[]): Record<string, string> {
     if (["name", "full_name"].includes(low)) out[col] = "name";
     else if (["phone", "phone_number", "tel"].includes(low)) out[col] = "phone";
     else if (["email", "e-mail"].includes(low)) out[col] = "email";
-    else if (["whatsapp", "whatsapp_id", "wa"].includes(low)) out[col] = "whatsapp_id";
+    else if (["telegram", "whatsapp_id", "wa"].includes(low)) out[col] = "whatsapp_id";
     else if (["source"].includes(low)) out[col] = "source";
     else out[col] = "ignore";
   }
@@ -364,7 +364,7 @@ function ContactsList() {
                     type="button"
                     onClick={() =>
                       toggleSort(
-                        col === "whatsapp"
+                        col === "telegram"
                           ? "created_at"
                           : col === "tags"
                             ? "created_at"
@@ -421,7 +421,7 @@ function ContactsList() {
                       (c.phone ?? "—")
                     ) : col === "email" ? (
                       (c.email ?? "—")
-                    ) : col === "whatsapp" ? (
+                    ) : col === "telegram" ? (
                       (c.whatsapp_id ?? "—")
                     ) : col === "owner" ? (
                       (users.data?.items.find((u) => u.id === c.owner_id)?.name ?? "—")

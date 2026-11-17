@@ -1,11 +1,14 @@
-"""Seed the demo DB with the TCS Leasing funnel and fictional demo data.
+"""Seed the demo DB with fictional TCS leasing data.
+
+The pipeline itself is created by Alembic (`funnel_seed.py`); this script only
+checks that «TCS Leasing» with its six stages exists and fills the demo slice.
 
 Safety:
 - refuses to run unless DEMO_DB_CONFIRM=I_UNDERSTAND_THIS_IS_A_DEMO_DB;
-- refuses to run when tcs_leads already has rows with source = 'whatsapp'
+- refuses to run when tcs_leads already has rows with source = 'telegram'
   (that looks like a production bot DB);
-- ``--reset`` deletes ONLY rows whose source is 'demo' (and their messages
-  and events). Never TRUNCATE, never touches other sources.
+- ``--reset`` deletes ONLY rows whose source is 'demo' (and their messages,
+  events, followups and metrics). Never TRUNCATE.
 
 Run:  python scripts/seed_tcs_demo.py [--reset]
 """
@@ -18,7 +21,6 @@ import json
 import os
 import random
 import sys
-import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -31,38 +33,24 @@ SCHEMA_SQL = ROOT / "tests" / "fixtures" / "tcs_schema.sql"
 CONFIRM_ENV = "DEMO_DB_CONFIRM"
 CONFIRM_VALUE = "I_UNDERSTAND_THIS_IS_A_DEMO_DB"
 DEMO_SOURCE = "demo"
-BLOCKING_SOURCE = "whatsapp"
+BLOCKING_SOURCE = "telegram"
 
 ET = ZoneInfo("America/New_York")
 
-# ---------------------------------------------------------------- funnel data
-
 PIPELINE_NAME = "TCS Leasing"
 
-# (name, color, kind, bot_stage_key, bot_status_key) in funnel order.
-# Colors reuse the legacy palette from backend/app/services/funnel_seed.py.
-STAGES: tuple[tuple[str, str, str, str | None, str | None], ...] = (
-    ("New inquiry", "#38BDF8", "open", "NEW_INQUIRY", None),
-    ("Qualifying", "#818CF8", "open", "QUALIFYING", None),
-    ("Unit matched", "#A78BFA", "open", "UNIT_MATCHED", None),
-    ("Viewing scheduled", "#FBBF24", "open", "VIEWING_SCHEDULED", None),
-    ("Viewing confirmed", "#FDE047", "open", "VIEWING_CONFIRMED", None),
-    ("Viewing done", "#34D399", "open", "VIEWING_DONE", None),
-    ("Application sent", "#F472B6", "open", "APPLICATION_SENT", None),
-    ("Follow-up", "#94A3B8", "open", "FOLLOW_UP", None),
-    ("Leased", "#16A34A", "won", None, "КЛИЕНТ"),
-    ("Lost", "#EF4444", "lost", None, "ОТКАЗ"),
+# The six stages the CRM seeds on an empty database. The script verifies them
+# and never creates or renames pipeline rows.
+EXPECTED_STAGES: tuple[tuple[str, str, str | None, str | None], ...] = (
+    ("New inquiry", "open", "NEW_INQUIRY", None),
+    ("Qualified", "open", "QUALIFIED", None),
+    ("Viewing scheduled", "open", "VIEWING_SCHEDULED", None),
+    ("Viewing done", "open", "VIEWING_DONE", None),
+    ("Leased", "won", None, "LEASED"),
+    ("Lost", "lost", None, "LOST"),
 )
 
-LOST_REASONS: tuple[str, ...] = (
-    "Price too high",
-    "Found another place",
-    "Not responding",
-    "Bad timing",
-    "Other",
-)
-
-# ------------------------------------------------------------------ demo data
+# ---------------------------------------------------------------- demo data
 
 BUILDINGS = ("Demo Residences A", "Demo Residences B", "Demo Residences C")
 UNITS_PER_BUILDING = (5, 5, 4)
@@ -103,21 +91,19 @@ FIRST_NAMES = (
     "Shawn",
 )
 
-# (bot_stage_key, lead status, count) — sums to 30. The two МЕНЕДЖЕР leads live
-# in UNIT_MATCHED and APPLICATION_SENT.
+# (bot_stage_key, lead status, count) - exactly 30 leads.
 STAGE_PLAN: tuple[tuple[str, str, int], ...] = (
     ("NEW_INQUIRY", "ACTIVE", 3),
-    ("QUALIFYING", "ACTIVE", 3),
-    ("UNIT_MATCHED", "ACTIVE", 2),
-    ("UNIT_MATCHED", "МЕНЕДЖЕР", 1),
-    ("APPLICATION_SENT", "ACTIVE", 1),
-    ("APPLICATION_SENT", "МЕНЕДЖЕР", 1),
-    ("VIEWING_SCHEDULED", "ЗАПИСАН", 2),  # future viewings
-    ("VIEWING_CONFIRMED", "ЗАПИСАН", 1),  # future viewing
-    ("VIEWING_DONE", "ACTIVE", 6),  # viewings that happened
-    ("FOLLOW_UP", "ДУМАЕТ", 5),  # 2 no-shows, 1 cancelled, 2 plain follow-ups
-    ("FOLLOW_UP", "ОТКАЗ", 3),
-    ("FOLLOW_UP", "КЛИЕНТ", 2),
+    ("NEW_INQUIRY", "THINKING", 1),
+    ("QUALIFIED", "ACTIVE", 2),
+    ("QUALIFIED", "THINKING", 3),  # two no-shows and one cancellation
+    ("QUALIFIED", "HANDOFF", 1),
+    ("VIEWING_SCHEDULED", "VIEWING_BOOKED", 4),  # future viewings
+    ("VIEWING_DONE", "ACTIVE", 6),
+    ("VIEWING_DONE", "THINKING", 1),
+    ("VIEWING_DONE", "HANDOFF", 1),
+    ("LEASED", "LEASED", 3),
+    ("LOST", "LOST", 5),
 )
 TOTAL_LEADS = 30
 AFTER_HOURS_TARGET = 12  # of 30 first messages outside Mon-Fri 09:00-17:00 ET
@@ -134,7 +120,7 @@ IN_CONTENT = (
 )
 OUT_CONTENT = (
     "Hi! This is the TCS assistant. I can check availability right away.",
-    "Sure — do you know the area you want and your move-in date?",
+    "Sure - do you know the area you want and your move-in date?",
     "Yes, that unit is available. Would you like to schedule a viewing?",
     "Great, I can offer a few viewing slots this week.",
     "You are booked! I will send a reminder before the viewing.",
@@ -173,6 +159,25 @@ async def schema_error(conn: asyncpg.Connection) -> str | None:
             f"Refusing to run: tcs_leads already has {blocking} row(s) with "
             f"source = '{BLOCKING_SOURCE}' (this does not look like a demo DB)."
         )
+    return None
+
+
+async def pipeline_error(conn: asyncpg.Connection) -> str | None:
+    """The pipeline must already exist (Alembic seeds it). Never create it here."""
+    row = await conn.fetchrow("SELECT id FROM crm_pipelines WHERE name = $1", PIPELINE_NAME)
+    if row is None:
+        return (
+            f"Pipeline '{PIPELINE_NAME}' not found. Run "
+            "`alembic upgrade head` first; this script never creates a pipeline."
+        )
+    stages = await conn.fetch(
+        "SELECT name, kind, bot_stage_key, bot_status_key FROM crm_stages"
+        " WHERE pipeline_id = $1 ORDER BY sort",
+        row["id"],
+    )
+    actual = [(s["name"], s["kind"], s["bot_stage_key"], s["bot_status_key"]) for s in stages]
+    if actual != list(EXPECTED_STAGES):
+        return f"Pipeline '{PIPELINE_NAME}' does not match the expected six stages: " f"{actual!r}"
     return None
 
 
@@ -248,64 +253,8 @@ async def seed_units(conn: asyncpg.Connection) -> int:
     return len(rows)
 
 
-async def seed_pipeline(conn: asyncpg.Connection) -> str:
-    """Create the TCS Leasing pipeline as the single default (idempotent)."""
-    pipeline_id = await conn.fetchval("SELECT id FROM crm_pipelines WHERE name = $1", PIPELINE_NAME)
-    if pipeline_id is None:
-        pipeline_id = str(uuid.uuid4())
-        await conn.execute(
-            "INSERT INTO crm_pipelines (id, name, is_default, sort)" " VALUES ($1, $2, TRUE, 0)",
-            pipeline_id,
-            PIPELINE_NAME,
-        )
-    # Exactly one default pipeline.
-    await conn.execute("UPDATE crm_pipelines SET is_default = FALSE WHERE id <> $1", pipeline_id)
-    await conn.execute("UPDATE crm_pipelines SET is_default = TRUE WHERE id = $1", pipeline_id)
-
-    for sort, (name, color, kind, stage_key, status_key) in enumerate(STAGES):
-        stage_id = await conn.fetchval(
-            "SELECT id FROM crm_stages WHERE pipeline_id = $1 AND name = $2", pipeline_id, name
-        )
-        if stage_id is None:
-            await conn.execute(
-                "INSERT INTO crm_stages (id, pipeline_id, name, color, sort, kind,"
-                " bot_stage_key, bot_status_key)"
-                " VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-                str(uuid.uuid4()),
-                pipeline_id,
-                name,
-                color,
-                sort,
-                kind,
-                stage_key,
-                status_key,
-            )
-        else:
-            await conn.execute(
-                "UPDATE crm_stages SET color = $3, kind = $4, bot_stage_key = $5,"
-                " bot_status_key = $6, sort = $2 WHERE id = $1",
-                stage_id,
-                sort,
-                color,
-                kind,
-                stage_key,
-                status_key,
-            )
-
-    for sort, name in enumerate(LOST_REASONS):
-        reason_id = await conn.fetchval("SELECT id FROM crm_lost_reasons WHERE name = $1", name)
-        if reason_id is None:
-            await conn.execute(
-                "INSERT INTO crm_lost_reasons (id, name, sort) VALUES ($1, $2, $3)",
-                str(uuid.uuid4()),
-                name,
-                sort,
-            )
-    return str(pipeline_id)
-
-
 async def seed_settings(conn: asyncpg.Connection) -> None:
-    """unanswered_after_minutes = 2 (JSON number, see RECON.md §3)."""
+    """unanswered_after_minutes = 2 (JSON number)."""
     await conn.execute(
         "INSERT INTO crm_settings (key, value)"
         " VALUES ('unanswered_after_minutes', $1::jsonb)"
@@ -392,14 +341,14 @@ async def seed_demo_leads(conn: asyncpg.Connection) -> None:
     if not unit_rows:
         raise RuntimeError("tcs_units is empty; run the units step first")
 
-    # The single Unanswered dialog: last message 'in' 30 minutes ago, bot live.
-    unanswered_index = 4
-    past_trial_status = {"ДУМАЕТ", "ОТКАЗ", "КЛИЕНТ"}
+    # The single unanswered dialog: NEW_INQUIRY, last message 'in' 30 min ago.
+    unanswered_index = 0
+    qualified_seen = 0  # three QUALIFIED thinking leads had a past viewing
 
     lead_rows: list[tuple] = []
     msg_rows: list[tuple] = []
     event_rows: list[tuple] = []
-    past_viewings = 0  # 6 happened + 2 no-shows + 1 cancelled = 9 past trials
+    past_viewings = 0
 
     for i, ((stage_key, status), after_hours) in enumerate(
         zip(plan, after_hours_flags, strict=True)
@@ -407,10 +356,10 @@ async def seed_demo_leads(conn: asyncpg.Connection) -> None:
         wa = f"tg:{900_000_000 + i}"
         name = f"{FIRST_NAMES[i]} Demo"
         phone = f"+1 215 555 {100 + i:04d}"
-        beds = 1 + i % 3
         unit = unit_rows[i % len(unit_rows)]
         building = unit["building"]
         budget = int(unit["rent_usd"] or 2000)
+        beds = 1 + i % 3
         pets = "cat" if i % 2 == 0 else "dog" if i % 5 == 0 else "none"
 
         created_at = now - timedelta(days=1 + (i * 29) // TOTAL_LEADS, hours=3 + i % 5)
@@ -424,25 +373,44 @@ async def seed_demo_leads(conn: asyncpg.Connection) -> None:
         trial: datetime | None = None
         previous_stage: str | None = None
         last_objection: str | None = None
-        if stage_key == "VIEWING_DONE":
-            past_viewings += 1
-            trial = now - timedelta(days=past_viewings + 2)
-            previous_stage = "VIEWING_CONFIRMED"
-        elif stage_key == "FOLLOW_UP" and status in past_trial_status and past_viewings < 9:
-            # The first three FOLLOW_UP leads (ДУМАЕТ) become no-show/cancelled.
+
+        if stage_key == "NEW_INQUIRY":
+            previous_stage = None
+        elif stage_key == "QUALIFIED":
+            previous_stage = "NEW_INQUIRY"
+            if status == "THINKING":
+                # Two no-shows and one cancellation come back to Qualified.
+                qualified_seen += 1
+                past_viewings += 1
+                trial = now - timedelta(days=past_viewings + 2)
+                last_objection = (
+                    "Missed the viewing" if qualified_seen % 2 == 0 else "Plans changed"
+                )
+            elif status == "ACTIVE":
+                last_objection = THINKING_OBJECTIONS[i % len(THINKING_OBJECTIONS)]
+        elif stage_key == "VIEWING_SCHEDULED":
+            trial = now + timedelta(days=2 + (i % 4))  # 2-5 days out
+            previous_stage = "QUALIFIED"
+        elif stage_key == "VIEWING_DONE":
             past_viewings += 1
             trial = now - timedelta(days=past_viewings + 2)
             previous_stage = "VIEWING_SCHEDULED"
-            last_objection = "Missed the viewing" if past_viewings % 2 == 0 else "Plans changed"
-        elif stage_key in ("VIEWING_SCHEDULED", "VIEWING_CONFIRMED"):
-            trial = now + timedelta(days=2 + (i % 4))  # future viewings, 2-5 days out
-            previous_stage = "UNIT_MATCHED"
-        elif stage_key == "FOLLOW_UP" and status == "ДУМАЕТ":
-            # Some plain follow-ups still have an open objection.
-            last_objection = THINKING_OBJECTIONS[i % len(THINKING_OBJECTIONS)]
+        elif stage_key == "LEASED":
+            past_viewings += 1
+            trial = now - timedelta(days=past_viewings + 2)
+            previous_stage = "VIEWING_DONE"
+        elif stage_key == "LOST":
+            previous_stage = "VIEWING_DONE"
+            last_objection = (
+                "Price too high",
+                "Found another place",
+                "Not responding",
+                "Bad timing",
+                "Other",
+            )[i % 5]
 
-        if status == "ОТКАЗ" and last_objection is None:
-            last_objection = LOST_REASONS[i % len(LOST_REASONS)]
+        if status == "HANDOFF":
+            last_objection = "Requested a human"
 
         lead_rows.append(
             (
@@ -506,7 +474,7 @@ async def seed_demo_leads(conn: asyncpg.Connection) -> None:
                     booked_at,
                 ),
             )
-        if status == "МЕНЕДЖЕР":
+        if status == "HANDOFF":
             event_rows.append(
                 (
                     wa,
@@ -517,7 +485,7 @@ async def seed_demo_leads(conn: asyncpg.Connection) -> None:
                     last_interaction,
                 )
             )
-        if status == "ОТКАЗ":
+        if status == "LOST":
             event_rows.append(
                 (
                     wa,
@@ -528,7 +496,7 @@ async def seed_demo_leads(conn: asyncpg.Connection) -> None:
                     last_interaction,
                 )
             )
-        if status == "КЛИЕНТ":
+        if status == "LEASED":
             event_rows.append((wa, "sale_won", None, stage_key, "{}", last_interaction))
 
     await conn.executemany(
@@ -573,7 +541,6 @@ async def seed_demo_leads(conn: asyncpg.Connection) -> None:
 
 async def run_seed(conn: asyncpg.Connection) -> dict[str, int]:
     """Seed everything; every step is idempotent. Returns counters."""
-    await seed_pipeline(conn)
     await seed_settings(conn)
     units = await seed_units(conn)
     await seed_demo_leads(conn)
@@ -597,6 +564,8 @@ async def main(argv: list[str] | None = None) -> int:
         conn = await asyncpg.connect(dsn=_dsn())
         if error is None and not args.reset:
             error = await schema_error(conn)
+        if error is None and not args.reset:
+            error = await pipeline_error(conn)
         if error is not None:
             print(f"ERROR: {error}", file=sys.stderr)
             return 2

@@ -9,7 +9,7 @@ from backend.app.services.normalize import (
     contact_keys,
     normalize_email,
     normalize_phone,
-    normalize_whatsapp,
+    normalize_telegram,
 )
 from backend.tests.conftest import csrf_headers
 from backend.tests.crm_helpers import (
@@ -26,7 +26,7 @@ pytestmark = pytest.mark.usefixtures("db_available")
 
 
 def _wa() -> str:
-    # 10 digits keeps the synthetic WhatsApp id strictly shorter than a real
+    # 10 digits keeps the synthetic Telegram id strictly shorter than a real
     # phone (11 digits), so duplicate detection always prefers the phone key
     # no matter which characters the random suffix contains.
     return f"79{uuid.uuid4().hex[:8]}@c.us"
@@ -37,9 +37,9 @@ def test_normalize_phone_cases() -> None:
     assert normalize_phone("8 701 000 11 22") == "77010001122"
     assert normalize_phone("77010001122@c.us") == "77010001122"
     assert normalize_phone(None) == ""
-    assert normalize_whatsapp("79991234567@c.us") == "79991234567"
-    assert normalize_whatsapp("79991234567@lid") == "79991234567"
-    assert normalize_whatsapp("tg:123456789") == ""
+    assert normalize_telegram("79991234567@c.us") == "79991234567"
+    assert normalize_telegram("79991234567@lid") == "79991234567"
+    assert normalize_telegram("tg:123456789") == ""
     assert contact_keys(None, "tg:123456789", None) == {"phone": None, "email": None}
     assert normalize_email("  AiG@Example.COM ") == "aig@example.com"
     keys = contact_keys("+7 (701) 000-11-22", None, "A@B.cC")
@@ -186,8 +186,8 @@ async def test_import_preview_and_background_job(client, settings):
         token = await admin_csrf(client, settings)
         csv_text = (
             "full_name,phone_number,email,src\n"
-            "Иван,+77011112233,ivan@example.com,import\n"
-            "Плохой,123,not-an-email,import\n"
+            "Ivan,+77011112233,ivan@example.com,import\n"
+            "Bad row,123,not-an-email,import\n"
             ",,,import\n"
         )
         mapping = {"full_name": "name", "phone_number": "phone", "email": "email", "src": "source"}
@@ -203,7 +203,7 @@ async def test_import_preview_and_background_job(client, settings):
         body = preview.json()
         assert body["total"] == 3
         assert body["valid"] == 1 and body["invalid"] == 2
-        assert body["preview"][0]["name"] == "Иван"
+        assert body["preview"][0]["name"] == "Ivan"
 
         job_resp = await client.post(
             "/api/contacts/import",
@@ -224,7 +224,7 @@ async def test_import_preview_and_background_job(client, settings):
         assert final["ok_count"] == 1 and final["error_count"] == 2
         assert len(final["errors"]) == 2
         found = await client.get("/api/contacts?search=ivan@example.com")
-        assert any("Иван" in (i["name"] or "") for i in found.json()["items"])
+        assert any("Ivan" in (i["name"] or "") for i in found.json()["items"])
         for item in found.json()["items"]:
             if item["email"] == "ivan@example.com":
                 contact_ids.append(item["id"])

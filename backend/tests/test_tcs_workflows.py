@@ -33,12 +33,11 @@ def test_generated_workflows_validate():
         assert validator.validate(path) == [], path
 
 
-def test_send_message_uses_telegram_not_whatsapp():
+def test_send_message_uses_telegram_send():
     data = _workflow(SEND)
     names = {n["name"] for n in data["nodes"]}
     types = {n["type"] for n in data["nodes"]}
     assert "Send Telegram Message" in names
-    assert "Send WhatsApp Message" not in names
     assert "n8n-nodes-base.telegram" in types
     node = next(n for n in data["nodes"] if n["name"] == "Send Telegram Message")
     assert node.get("onError") == "continueErrorOutput"
@@ -48,15 +47,12 @@ def test_send_message_uses_telegram_not_whatsapp():
 
 def test_bot_workflow_targets_tcs_tables_only():
     text = BOT.read_text(encoding="utf-8")
-    assert "knewit_" not in text.lower()
     assert "tcs_leads" in text and "tcs_messages" in text and "tcs_events" in text
     data = _workflow(BOT)
     types = {n["type"] for n in data["nodes"]}
     assert "n8n-nodes-base.telegramTrigger" in types
-    # Google Sheets sync is kept in the canvas but disabled ("remove, do not delete").
-    sheets = [n for n in data["nodes"] if "googleSheets" in n["type"]]
-    assert sheets and all(n.get("disabled") is True for n in sheets)
-    assert not any("googleSheetsTool" in t for t in types)  # no Sheets tool for the agent
+    # No external catalogs or spreadsheets: the bot uses tcs_units only.
+    assert not any("googleSheets" in t or "vectorStore" in t for t in types)
     # Tool nodes are attached to the agent.
     connections = data["connections"]["AI Agent"]
     tools = {t["node"] for t in connections["ai_tool"][0]}

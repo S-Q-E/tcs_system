@@ -169,7 +169,7 @@ async def purge_contacts(factory, contact_ids: list[str]) -> None:
             await session.execute(
                 text("DELETE FROM crm_notes WHERE contact_id = :id"), {"id": contact_id}
             )
-        whatsapps = (
+        telegrams = (
             (
                 await session.execute(
                     text("SELECT whatsapp_id FROM crm_contacts WHERE id = ANY(:ids)"),
@@ -182,7 +182,7 @@ async def purge_contacts(factory, contact_ids: list[str]) -> None:
         await session.execute(
             text("DELETE FROM crm_contacts WHERE id = ANY(:ids)"), {"ids": contact_ids}
         )
-        for wa in whatsapps:
+        for wa in telegrams:
             if wa:
                 await session.execute(
                     text("DELETE FROM crm_conversation_state WHERE whatsapp_id = :wa"), {"wa": wa}

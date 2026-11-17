@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     notifications_enabled: bool = Field(default=True, alias="NOTIFICATIONS_ENABLED")
     realtime_enabled: bool = Field(default=True, alias="REALTIME_ENABLED")
 
-    # Step 9 manager outbox: n8n webhook that actually sends WhatsApp messages.
+    # Step 9 manager outbox: n8n webhook that actually sends Telegram messages.
     n8n_send_webhook_url: str = Field(default="", alias="N8N_SEND_WEBHOOK_URL")
     n8n_webhook_secret: str = Field(default="", alias="N8N_WEBHOOK_SECRET")
     outbox_interval_seconds: int = Field(default=5, ge=1, alias="OUTBOX_INTERVAL_SECONDS")

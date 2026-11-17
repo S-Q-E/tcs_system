@@ -33,7 +33,7 @@ async def test_contact_crud_and_search(client, settings):
             client,
             token,
             whatsapp_id=_wa(),
-            name="Айгерим Поиск",
+            name="Aigerim Search",
             phone="+7 (701) 000-11-22",
             email="aigerim@example.com",
         )
@@ -43,7 +43,7 @@ async def test_contact_crud_and_search(client, settings):
         assert fetched.status_code == 200
         assert fetched.json()["phone"] == "+7 (701) 000-11-22"
 
-        by_name = await client.get("/api/contacts?search=айгерим поиск")
+        by_name = await client.get("/api/contacts?search=aigerim search")
         assert any(i["id"] == created["id"] for i in by_name.json()["items"])
         by_digits = await client.get("/api/contacts?search=7010001122")
         assert any(i["id"] == created["id"] for i in by_digits.json()["items"])
@@ -52,11 +52,11 @@ async def test_contact_crud_and_search(client, settings):
 
         patched = await client.patch(
             f"/api/contacts/{created['id']}",
-            json={"name": "Айгерим Обнова"},
+            json={"name": "Aigerim Updated"},
             headers=csrf_headers(token),
         )
         assert patched.status_code == 200
-        assert patched.json()["name"] == "Айгерим Обнова"
+        assert patched.json()["name"] == "Aigerim Updated"
         await assert_logged(factory, "contact", created["id"], "contact_updated")
     finally:
         await purge_contacts(factory, contact_ids)

@@ -27,7 +27,7 @@ async def _insert_lead(factory, wa: str) -> None:
         await session.execute(
             text(
                 "INSERT INTO tcs_leads (whatsapp_id, name, current_stage, status)"
-                " VALUES (:wa, 'Probe', 'НОВЫЙ_ЛИД', 'ACTIVE')"
+                " VALUES (:wa, 'Probe', 'NEW_INQUIRY', 'ACTIVE')"
             ),
             {"wa": wa},
         )
@@ -110,7 +110,7 @@ async def test_import_rejects_files_over_2mb(client, settings):
         assert response.status_code == 413, (url, response.status_code, response.text[:200])
         assert response.json()["error"]["code"] == "REQUEST_TOO_LARGE"
     # Just under the limit still parses (small sanity file).
-    small = ("name,phone\nИван,+77011112233\n").encode()
+    small = b"name,phone\nIvan,+77011112233\n"
     ok_preview = await client.post(
         "/api/contacts/import/preview",
         files={"file": ("ok.csv", small, "text/csv")},
@@ -145,7 +145,7 @@ async def test_outbox_failure_stores_short_class_only_error(client, settings):
         token = await admin_csrf(client, settings)
         await _insert_lead(factory, wa)
         queued = await client.post(
-            f"/api/chats/{wa}/messages", json={"body": "Сбой"}, headers=csrf_headers(token)
+            f"/api/chats/{wa}/messages", json={"body": "Failure"}, headers=csrf_headers(token)
         )
         assert queued.status_code == 202
 
@@ -181,12 +181,12 @@ async def test_outbox_mirror_failure_prefix_is_short(client, settings, monkeypat
         token = await admin_csrf(client, settings)
         await _insert_lead(factory, wa)
         queued = await client.post(
-            f"/api/chats/{wa}/messages", json={"body": "Зеркало"}, headers=csrf_headers(token)
+            f"/api/chats/{wa}/messages", json={"body": "Mirror"}, headers=csrf_headers(token)
         )
         assert queued.status_code == 202
 
         async def broken_mirror(session, whatsapp_id, body):
-            raise RuntimeError("tcs_messages wedged; params {'content': 'Зеркало'}")
+            raise RuntimeError("tcs_messages wedged; params {'content': 'Mirror'}")
 
         monkeypatch.setattr(worker_mod, "insert_outgoing_message", broken_mirror)
 
@@ -256,7 +256,7 @@ async def test_analytics_managers_visible_setting(client, settings, app):
 
 
 def test_n8n_workflow_and_readme_present():
-    workflow = REPO_ROOT / "docs" / "n8n" / "crm-send-message.workflow.json"
+    workflow = REPO_ROOT / "docs" / "n8n" / "tcs-send-message-telegram.workflow.json"
     readme = REPO_ROOT / "docs" / "n8n" / "README.md"
     assert workflow.is_file() and readme.is_file()
     data = json.loads(workflow.read_text())
@@ -264,6 +264,7 @@ def test_n8n_workflow_and_readme_present():
     assert "CRM Send Webhook" in names
     assert "Check Secret" in names
     assert "Check Duplicate" in names
+    assert "Send Telegram Message" in names
     assert "Respond OK" in names
     # Secret check references the env secret and has a 401 branch.
     text_blob = workflow.read_text()
@@ -277,12 +278,13 @@ def test_n8n_workflow_and_readme_present():
     assert "ON CONFLICT (outbox_id) DO NOTHING" in text_blob
     assert "n8n_processed_outbox" in text_blob
     assert "SELECT COUNT(*)" in text_blob
+    assert "n8n-nodes-base.telegram" in text_blob
+    assert "continueErrorOutput" in text_blob
     secret_params = json.dumps(by_name["Check Secret"]["parameters"])
     assert "notEmpty" in secret_params
     assert '"caseSensitive":true' in secret_params.replace(" ", "")
     readme_text = readme.read_text()
-    assert "bot_paused" in readme_text
-    assert "crm_conversation_state" in readme_text
-    assert "AI" in readme_text
-    assert "запасной вариант" in readme_text
-    assert "static data" in readme_text or "staticData" in readme_text
+    assert "crm-send-message" in readme_text
+    assert "X-CRM-Secret" in readme_text
+    assert "n8n_processed_outbox" in readme_text
+    assert "Telegram" in readme_text

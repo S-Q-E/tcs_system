@@ -12,15 +12,15 @@ branch_labels = None
 depends_on = None
 
 _SEED_REPLIES = (
-    ("Приветствие", "Здравствуйте, {name}! Чем могу помочь?", 10),
+    ("Greeting", "Hi {name}! How can I help you today?", 10),
     (
-        "Напоминание о пробном",
-        "{name}, напоминаем о пробном занятии. Подтвердите, пожалуйста, что придёте!",
+        "Viewing reminder",
+        "{name}, a reminder about your upcoming viewing. Please confirm you can make it!",
         20,
     ),
     (
-        "Спасибо за обращение",
-        "Спасибо за обращение, {name}! Если появятся вопросы — пишите сюда.",
+        "Thank you",
+        "Thank you for reaching out, {name}! If you have more questions, just message us here.",
         30,
     ),
 )

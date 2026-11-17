@@ -1,954 +1,258 @@
-# Architecture Decisions
+# Decisions
 
-All decisions are in English for the codebase. UI texts stay in Russian.
+Architecture decisions for the TCS Leasing CRM. Numbers are stable because
+code comments reference them.
 
 ## D1. Sessions, not JWT
-Server-side sessions in `crm_sessions` table, token in httpOnly + Secure + SameSite=Lax cookie.
-Why: revocable, simpler security model, no token refresh complexity.
+
+Opaque random session tokens in `crm_sessions`, stored as SHA-256 hashes, sent
+in an HttpOnly cookie; CSRF is a double-submit token for unsafe methods.
+14-day sliding TTL.
 
 ## D2. One bot lead = one contact + one deal by default
-Link by `whatsapp_id`. Manager creates a new deal manually for repeat purchases.
-Why: keeps mapping simple and predictable; avoids ambiguous multi-deal sync.
+
+The sync worker creates a contact and a deal per bot lead (`whatsapp_id` is the
+join key). A deal is never duplicated for the same lead.
 
 ## D3. Two-way stage sync
-- Bot changed stage (`tcs_leads.current_stage` / `status`) -> sync worker moves the deal to the stage with matching `bot_stage_key`.
-- Manager moved the deal manually -> `stage_locked = true`. Further auto-moves by bot stop; bot changes are only written to history and notify the manager.
-- If the target stage has `bot_stage_key`, `bot_bridge` updates `tcs_leads.current_stage` and writes `event_type='manual_stage_change'` into `tcs_events` in one transaction. If no key is set, bot tables are not touched.
-- Manager can unlock with the "Return control to bot" button.
-Why: manager decision wins, but bot history stays auditable; writes to `tcs_*` go only through `backend/app/services/bot_bridge.py`.
+
+The bot moves deals by `bot_stage_key`; managers move deals in the CRM and the
+move is written back to the bot lead through `services/bot_bridge.py`, the only
+writer to bot tables. A locked stage blocks bot moves and logs an activity.
 
 ## D4. Realtime without triggers
-n8n writes to DB directly, so CRM polls `tcs_messages` / `tcs_events` (by `id > last_seen_id`, every 2-3 sec) and pushes to clients via SSE. Background workers run in-process under `pg_try_advisory_lock` so multiple Railway instances do not duplicate work.
-Why: `tcs_*` tables must not get triggers (rule 1); polling + advisory lock is the least invasive option.
+
+No Postgres triggers or logical replication. A poller reads bot tables by id
+and fans out on a process-local event bus; SSE clients consume it at
+`GET /api/stream`.
 
 ## D5. Bot autopause
-When lead status becomes `МЕНЕДЖЕР`, CRM creates an urgent task and a notification. Bot autopause: setting `auto_pause_on_manager`, disabled by default.
-Why: explicit handover without surprising the client; autopause stays opt-in.
+
+Settings control pausing the bot on handover (`auto_pause_on_manager`) and on a
+manual manager reply (`auto_pause_on_manual_reply`). The pause flag lives in
+`crm_conversation_state` and the bot checks it before replying.
 
 ## D6. Manager outbound messages go through outbox + n8n webhook
-CRM does not store WhatsApp provider keys. It calls the n8n webhook with a secret, and n8n sends via the provider already used in the bot workflow.
-Why: single sender path, no credential duplication.
-- Delivery (Step 9): a `crm_outbox` row (`queued`) is POSTed by the worker as `{outbox_id, whatsapp_id, text}` to `N8N_SEND_WEBHOOK_URL` with header `X-CRM-Secret: N8N_WEBHOOK_SECRET`. On `{"ok": true}` the row becomes `sent` (`sent_at`, `provider_message_id`) and `bot_bridge.insert_outgoing_message` mirrors it into `tcs_messages` as `direction='out', message_type='manager', tokens_used=0`, stamped with the lead's current stage. `crm_outbox.tcs_message_id` links the mirrored row so the timeline shows the sender's name.
-- Reliability (hotfix 9B): states are `queued -> sending -> sent|failed` (migration `0012_outbox_sending` adds `claimed_at`). The claim transaction marks rows `sending`, so a concurrent instance never picks them up; `sending` rows older than 2 minutes are reaped to `failed` with `error='delivery state unknown, check WhatsApp'` and no auto-retry. The mirror runs in a SAVEPOINT: any mirror error rolls back only the mirror, the row stays `sent` with `error='mirror_failed: ...'` and an ERROR log. Every row is wrapped in try/except, so one poisoned row never stops the cycle.
-- Retry policy (hotfix 9B): auto-retry only when the request provably never reached n8n (`httpx.ConnectError` incl. DNS, `httpx.ConnectTimeout`; transport errors propagate raw from `post_to_n8n` for classification). Read timeouts, HTTP errors and rejections fail at once (`failed` + notify, attempts+1) and wait for the manual retry button, which warns about possible double delivery. Retryable errors keep exp backoff (1m/2m/4m/8m, cap 1h) up to 5 attempts, then `failed` + `outbox_failed` notify. `outbox_id` lets n8n dedupe redeliveries.
-- `httpx` moved into production `requirements.txt` (the worker needs an HTTP client; it was dev-only before).
-- Pause/resume toggles write contact-scoped `bot_paused`/`bot_resumed` activity rows, so the events show in the deal timeline. A manager send auto-pauses the bot via the `auto_pause_on_manual_reply` setting (default true) — unlike `auto_pause_on_manager` (default false), because a human reply mid-bot-flow would otherwise collide with the bot.
-- Chats visibility (hotfix 9B): `/api/chats/*` honors `restrict_managers_to_own` via the linked contact owner (leads without a contact count as unassigned); pause/resume/send return 404 `LEAD_NOT_FOUND` when the lead is gone; retry is author-or-admin (403 otherwise). SSE `new_message`/`bot_event` are filtered the same way per connection (owner cached per `whatsapp_id`).
-- SECRET_KEY is optional (default ""): app auth uses opaque random session tokens (sha256 in DB) and nothing signs with it; the variable is kept for operator tooling and future use.
+
+The CRM stores no provider keys. A manager message is queued in `crm_outbox`;
+the outbox worker POSTs `{outbox_id, whatsapp_id, text}` with `X-CRM-Secret` to
+`N8N_SEND_WEBHOOK_URL`; n8n sends via Telegram and dedupes on `outbox_id`.
+A mirrored row is written to `tcs_messages` by `bot_bridge.py`.
 
 ## D7. Soft delete
-`deleted_at` for contacts and deals. Hard delete by admin only.
-Why: protects against accidental data loss, keeps audit trail.
+
+Contacts and deals are soft-deleted (`deleted_at`); restore is supported.
+Bot tables are never modified for deletion.
 
 ## D8. Step 1 skeleton notes
-- Pytest modules live in `backend/tests/`; SQL fixtures stay in `tests/fixtures/` (referenced by `docker-compose.yml` and `scripts/seed_local.py`).
-- SQLAlchemy engine lifecycle belongs to the app (`lifespan`, `app.state`), never to module globals — globals bind asyncpg connections to the first event loop and break tests/reloads.
-- `/api/ready` is public alongside `/api/health` so orchestrators can probe readiness without credentials.
-- `alembic.ini` uses a repo-root-relative `script_location = backend/alembic` so `alembic -c backend/alembic.ini` works from the repo root (CI, dev).
-- Ruff ignores `B008` because `Depends(...)` in endpoint defaults is the standard FastAPI idiom.
+
+FastAPI + SQLAlchemy 2.0 async + Alembic baseline; errors are uniform
+`{error:{code,message,details}}`; request-id middleware and JSON logs; the
+health endpoints are `/api/health` and `/api/ready`.
 
 ## D9. Step 2 auth notes
-- Cookies: `crm_session` (httpOnly, Secure per `COOKIE_SECURE`, SameSite=Lax, 14 days)
-  + `crm_csrf` (readable by JS) for double-submit CSRF. The CSRF token hash is stored
-  on the session row, so a token is bound to its session, not just to the browser.
-- CSRF is required for unsafe `/api/*` methods, except `POST /api/auth/login`
-  (no session exists yet there; SameSite=Lax is the protection). Auth is enforced in
-  `SessionAuthMiddleware` so legacy routers are covered too; `require_user` /
-  `require_role('admin')` dependencies expose the current user to handlers.
-- Login rate limit is in-memory: 5 failures / 10 min per (IP, email) plus
-  20 failures / 10 min per email across all IPs (rotating IPs still trips
-  it); success resets both. A spoofed `X-Forwarded-For` prefix is harmless:
-  the IP is the entry just before the last `TRUSTED_PROXY_HOPS` values
-  (default 1, i.e. the last value added by our proxy), falling back to the
-  direct peer when the chain is shorter or hops is 0.
-  Justification: deploy target is a single Railway container, so a process-local
-  store is sufficient and avoids an extra table. Revisit if workers scale out.
-- Emails are normalized (strip + lowercase) before lookup/storage; passwords use
-  argon2 (`argon2-cffi`), minimum length 10, enforced by Pydantic and bootstrap.
-- First admin is bootstrapped at startup from `ADMIN_EMAIL`/`ADMIN_PASSWORD` only
-  when zero admins exist; afterwards the variables are ignored. Deactivating or
-  demoting the last active admin is rejected (`LAST_ADMIN`). Deactivation revokes
-  all sessions; password change revokes all other sessions.
-- Step 0 Basic Auth removed entirely (middleware, settings, `.env.example`).
+
+Argon2 password hashes; login rate limits are in-memory (single process) with
+per-IP and per-email windows; the first admin is bootstrapped from
+`ADMIN_EMAIL`/`ADMIN_PASSWORD` only when no admin exists; the last active
+admin cannot be demoted or deactivated.
 
 ## D10. Step 3 domain and bot sync notes
-- Default funnel `Продажи Knewit` is seeded in migration `0003_domain` (idempotent
-  `seed_default_funnel`, matched by name). All 14 bot `current_stage` values map to
-  open stages via `bot_stage_key`; finals `Клиент`/`Отказ` carry only `bot_status_key`.
-  `ДУМАЕТ`/`МЕНЕДЖЕР` are not stages.
-- Sync mapping: bot `status` wins (`КЛИЕНТ`/`ОТКАЗ` -> won/lost + `closed_at`);
-  otherwise the stage with matching `bot_stage_key`; unknown/NULL stage falls back
-  to the first open stage. One managed deal per contact = most recently updated
-  non-deleted deal; soft-deleted contacts are skipped, never resurrected.
-- Deal `title` is set once at creation; `custom` is merged by key (only
-  `CUSTOM_FIELDS` from the lead are refreshed, manager keys survive);
-  `trial_at` is refreshed only when `trial_datetime` is non-NULL and differs
-  from `last_bot_trial_at` (NULL never erases a manager value);
-  `contact.name` is refreshed only while it still matches `last_bot_name`
-  (migration `0009_sync_snapshot`); new-deal history uses `source='system'`, bot moves `'bot'`,
-  `changed_by=NULL`. Blocked moves (stage_locked) write `bot_stage_blocked` to
-  `crm_activity_log`, not to stage history (nothing moved); manager notification
-  delivery is Step 9.
-- `bot_bridge.update_bot_stage` joins the caller's transaction (no commit inside);
-  it no-ops when the stage is unchanged and raises `BotLeadNotFoundError` otherwise.
-- Worker holds session-scoped `pg_try_advisory_lock` for the whole cycle and
-  commits after every batch of 500 (no giant transaction). Incremental cycles
-  fetch only leads with `GREATEST(updated_at, last_message_at)` newer than
-  `last_synced_at` minus a 2-minute overlap; a full reconciliation runs when
-  `last_full_synced_at` is older than 10 minutes (both markers in
-  `crm_settings`). Each batch preloads states/contacts/managed-deals with
-  `IN` queries, unread counts with one `GROUP BY`, stage tops with one
-  `GROUP BY`, and handover tasks with one query. Interval/flag via
-  `SYNC_ENABLED`/`SYNC_INTERVAL_SECONDS`.
+
+CRM tables use the `crm_` prefix and are created only by Alembic. Bot tables
+are read-only for the CRM except `bot_bridge.py`. The sync worker runs every
+5 seconds under a Postgres advisory lock, backfills in batches, and updates
+contacts, deals, stage history, unread counts and dialog cache.
 
 ## D11. Step 4 domain REST API notes
-- Reads are open to all authenticated users; mutations of funnel (pipelines/stages),
-  custom-field definitions, and lost reasons are admin-only. Managers do full tag
-  CRUD and note CRUD (foreign notes: delete by author or admin).
-- `crm_deals.position` is `NUMERIC(20,10)` (migration `0004`, fractional indexing);
-  I/O uses float. Same-stage `move` only reorders (no lock/history/bridge);
-  cross-stage `move` locks, records manager history, and calls `bot_bridge` when the
-  target has `bot_stage_key` (missing bot lead logs a warning, manager move stands).
-- New deals only into open stages; `lost` requires `lost_reason_id`; reopening
-  clears `closed_at`/`lost_reason`. Stage delete with deals needs `to_stage_id`
-  (query param); pipeline delete with stages is refused. `bulk` (max 200 ids) is
-  all-or-nothing in one transaction.
-- Board: per-column `limit` (default 50) + opaque `next_cursor` per column;
-  `cursors` request param is a JSON `{stage_id: cursor}` map. Totals/amounts cover
-  the whole column, not the page.
-- Custom validation checks only defined fields (unknown keys pass through: the bot
-  sync mirrors lead attributes into the same payload); `required` must be present
-  and non-null. Tag filter on lists is ANY-match. Scope violations return 404, not
-  403, to avoid leaking existence. Soft-deleted contacts hide their deals.
-- `restrict_managers_to_own` lives in `crm_settings` (default false = amoCRM-style
-  open access); no UI yet (Step 11).
+
+Pipelines/stages CRUD is admin-only; contacts support search and filters;
+deals expose board (per-column cursors) and list views; notes use fractional
+positions; tags, custom fields and lost reasons have role-aware CRUD; every
+mutation writes an activity log entry.
 
 ## D12. Step 5 frontend scaffold notes
-- New `frontend/` (Vite + React 18 + TS strict + Tailwind v3 + shadcn-style `ui/`
-  components, TanStack Query, React Router, lucide-react). Full shadcn CLI setup
-  was skipped: hand-written `button`/`input` in shadcn style (cva) are enough for
-  the scaffold; adopt the CLI when the component set grows.
-- API client: `fetch` with `credentials: include`, CSRF header auto-attached from
-  the `crm_csrf` cookie (login exempt), 401 redirects to `/login?next=...`, backend
-  error envelope parsed into `ApiError`, toasts for user feedback.
-- Backend serves `frontend/dist` when built (else legacy), with SPA fallback for
-  non-`/api` paths; hashed `assets/*` are `immutable`, `index.html` is `no-cache`.
-- Registry mirror only keeps recent versions, so: `react-router-dom` v7 (v6 pruned;
-  used API is v6-compatible), `happy-dom` instead of `jsdom` (jsdom 30 needs newer
-  Node than the local 20.19), `openapi-typescript` generates `src/api/types.ts`.
-- `docker build` could not run locally (no Docker daemon access); the multi-stage
-  Dockerfile is written for CI/Railway. Staging HTTPS check needs Railway access.
+
+Vite + React 18 + TypeScript strict + Tailwind; TanStack Query; an API client
+with cookies, automatic CSRF and 401 redirects; openapi-typescript types
+(`npm run gen:api`); amoCRM-like layout, light/dark theme; backend serves the
+built SPA with SPA fallback.
 
 ## D13. Step 6 kanban notes
-- Board columns come from `GET /api/deals/board` (totals/amounts cover the whole
-  column); per-column cursor pages merge client-side ("Показать ещё"). Contact
-  names/phones join client-side from one cached `/api/contacts?limit=500` call.
-- DnD (dnd-kit, pointer distance 4 + keyboard sensor): same-column drops reorder
-  only (no lock/history); cross-column drops that hit `lost` open the reason modal
-  first, `won` asks for confirmation. Optimistic cache patch with rollback on error.
-- Filters live in URL params (shareable) + `crm_saved_views` (migration `0005`,
-  own-or-shared visibility, sharing is admin-only). Board/list endpoints accept the
-  same filter set; `contact_source` filter was added to deals list+board for this.
-- Cards never show fake state: task/unread/bot-pause badges arrive with the chat
-  and tasks steps (code has no placeholders for them). Task quick-action and
-  "без задач"/"просроченные" filters are deferred to the tasks step.
-- E2E (Playwright, chromium headless shell) runs against the built SPA + real API
-  and restores the moved seed deal (move back + unlock) so reruns stay green.
+
+Drag-and-drop with dnd-kit and optimistic updates with rollback; per-column
+cursor pagination; column sums; card shows contact, amount, owner, tags,
+viewing time, lock and last activity; list view supports sorting, column
+toggles and bulk actions; saved views keep filters in the URL.
 
 ## D14. Step 7 card, timeline, and dialogs notes
-- `GET /api/deals/{id}/timeline` merges messages, events, stage history, notes,
-  tasks, and activity newest-first with a keyset cursor `{at, kind, id}` and
-  per-source predicates (numeric compare for bot ids, text compare for uuids).
-  Outgoing messages are labeled "Бот" until the outbox (Step 5) adds manager
-  attribution. API deal creation now writes a manager-creation history row so the
-  лента is complete from birth.
-- Fresh conversation rows start read (`last_read_at=now`, unread 0); older rows
-  initialize `last_read_at` on first pass. Unread counts incoming messages after
-  `last_read_at`. Opening a dialog zeroes it. "Ждут менеджера" is covered by the
-  unread filter; route stays `/dialogs` (no rename churn).
-- Removed `/api/stats`, `/api/funnel` (analytics returns in a later step) and
-  `frontend-legacy/`; `/api/leads*` stay until dialogs fully replace them.
-- Card task badges stay deferred (timeline covers tasks); send box and quick
-  replies render as explicit "next step" stubs, never fake sends.
+
+The deal card combines overview, chat and history; the timeline merges bot
+messages/events, stage history, notes, tasks and activity; dialogs support
+search, filters, unread counters and the unanswered flag.
 
 ## D15. Step 8 tasks and notifications notes
-- `crm_notifications` (user FK CASCADE, type, payload with `dedupe_key`, read_at)
-  + `crm_automations` (name, is_active, trigger, config, actions). Standalone
-  tasks allowed (migration `0008` drops the target check).
-- `notify()` dedupes on unread rows with the same (user, type, dedupe_key).
-  Worker (60s loop, own xact lock): overdue + due-within-24h reminders keyed per
-  task per day; automations evaluated in the same cycle.
-- D5 handover in the sync worker: МЕНЕДЖЕР status creates (once per deal, see D32) urgent
-  "Ответить клиенту" (due +1h, once per deal) + notifies owner (or all managers);
-  `auto_pause_on_manager` setting (default false) gates bot pausing. Fresh
-  conversation rows start read; unread 0→N transitions notify the assignee;
-  locked-stage bot moves notify the owner (all managers when unowned).
-- Round-robin (`deal_assignment` setting, default `unassigned`) rotates by roster
-  position among active managers and applies to API-created deals only, plus
-  `deal_assigned` notification when owner != creator.
-- Automations: triggers `deal_entered_stage` / `no_activity_hours` (optional
-  `pipeline_id` scope), actions create_task/assign_owner/add_tag/notify; fire-once
-  per (automation, deal) via `automation_fired` activity rows. Mutations are
-  admin-only; automations UI itself lands in Settings (Step 11).
+
+Tasks have types, assignees, due dates and done/undone state; a worker creates
+due-soon and overdue notifications; automations create tasks from rules;
+notification delivery is deduplicated per user and entity.
 
 ## D16. Step 10 realtime notes
-- `services/event_bus.py` is a process-local fan-out hub (bounded per-subscriber
-  queues, slow consumers drop oldest, publishers never block). Single-container
-  deploy, so one event loop is enough; every worker and router shares it.
-- `workers/realtime_poller.py` polls `tcs_messages` / `tcs_events` by id
-  every 2s (cursors in memory, seeded from current maxima at startup so restarts
-  never replay history). It emits `new_message` and `bot_event`; CRM-side changes
-  publish directly at their call sites instead: sync bot moves buffer `deal_moved`
-  per batch and flush after the batch commit; deals/tasks/chats/outbox publish
-  after their own commits. `notify()` publishes `notification` for every created
-  row (pre-commit by design, covering workers and API uniformly; subscribers
-  refetch, which converges on the next event).
-- `GET /api/stream` (SSE, session cookie, no CSRF on GET): `: connected` prologue,
-  `event: <type>` + JSON data frames, `: heartbeat` comments every 15s, disconnect
-  detection with guaranteed unsubscribe. Per-user filter mirrors REST visibility:
-  notifications go only to their owner; deal events respect
-  `restrict_managers_to_own` via the published `owner_id`; everything else is
-  visible to any authenticated user (dialogs/tasks lists are global).
-- Frontend `useEventStream` (mounted once in the layout): one EventSource,
-  per-type listeners, TanStack invalidations per event, ping + toast for incoming
-  messages in dialogs assigned to the current user, unread count in the tab title.
-  Reconnect uses capped exponential backoff (1s→30s); after 6 failures (or no
-  EventSource at all) it falls back to 15s polling of the core query keys.
-- Tests hit a real limit: httpx's ASGI transport buffers the entire response
-  body, so infinite SSE streams hang forever under it. Streaming tests therefore
-  boot uvicorn on 127.0.0.1:0 (`live_server` fixture); the 50-connection load
-  test (`scripts/stream_load_test.py`) does the same against a dev server.
+
+SSE with heartbeats; the poller keeps cursors in `crm_settings` and overlaps
+windows to avoid gaps; events are deduplicated by id; the client falls back to
+polling when the stream is unavailable.
 
 ## D17. Step 11 contacts and data notes
-- Normalization lives in `services/normalize.py`: digits-only phones
-  (leading 8 -> 7 for 11-digit KZ/RU numbers), `whatsapp_id` stripped of
-  `@c.us`/`@lid` suffixes into the same digit space, emails lower+strip.
-  Duplicates group live contacts by `phone:<digits>=7+>` or `email:<lower>`;
-  no DB column is added (volumes are hundreds, Python grouping is enough).
-- Merge (`POST /api/contacts/merge`): deals/notes/tasks re-point to the
-  winner, tags union, empty winner fields filled from the loser, loser
-  soft-deleted, `contact_merged` + `contact_merged_from` activity rows.
-  No rollback (per brief); the source row stays recoverable via restore.
-- Contact bulk (`POST /api/contacts/bulk`, max 200): set owner, add tag,
-  soft-delete. Static `/duplicates`, `/bulk`, `/export`, `/import/*` routes
-  are registered before `/{contact_id}` so FastAPI does not capture them
-  as UUIDs.
-- Contact timeline (`GET /api/contacts/{id}/timeline`) reuses the deal
-  keyset scheme: bot messages/events by `whatsapp_id`, stage history of all
-  contact deals, notes/tasks/activity across the contact and its deals.
-- Export (`GET /api/contacts/export`, `/api/deals/export`, `?format=csv|xlsx`):
-  CSV streams with UTF-8 BOM for Excel; XLSX via `openpyxl` (new production
-  dep, added together with `python-multipart` for CSV uploads).
-- Import is contacts-only (deals import stays deferred): `POST
-  /api/contacts/import/preview` validates mapping+C SV and returns
-  per-row errors; `POST /api/contacts/import` stores header+rows inside
-  `crm_imports.mapping` (migration `0011_contacts_data`) and processes them
-  in a background `asyncio` task with `ok_count`/`error_count`/`errors[:200]`;
-  `GET /api/contacts/import/{id}` polls the job.
-- Trash (`GET /api/trash`, admin-only) lists soft-deleted contacts+deals;
-  restore reuses the existing per-entity endpoints.
-- Frontend `/contacts` has tabs Список/Дубликаты/Импорт/Корзина plus
-  `/contacts/:id` (deals, timeline, custom fields, tags). Saved views with
-  `entity=contact` are supported. `src/api/types.ts` was not regenerated
-  (no Node locally); the new API module uses hand-written types.
-## D18. Step 9C visibility rule for dialogs, chats and SSE
-- The brief asked for D15, but D15 is taken (tasks/notifications); this lands as D18.
-- Decision: dialogs (`/api/dialogs*`), `/api/chats/*` and SSE event kinds
-  `new_message`, `bot_event`, `outbox_status`, `bot_paused` obey
-  `restrict_managers_to_own` through the *deal* owner, not the contact
-  owner: the responsible user is the owner of the most recently updated
-  live deal of the linked contact (`services/visibility.py::lead_owner`).
-  Without a live deal the contact owner applies; without a contact the lead
-  counts as unassigned (visible to all).
-- Why the deal owner: the deal is the working object (round-robin assigns
-  deal owners, handover notifies deal owners); a reassigned deal must move
-  visibility with it. The dialogs list filters in SQL (LATERAL managed-deal
-  subquery + CASE fallback, paginated), single-object endpoints and the
-  per-connection SSE cache use the same helper, so REST and stream agree.
 
-## D19. Step 9C debt-closure notes- Unassign: PATCH distinguishes "field absent" from explicit `null` via
-  `payload.model_fields_set` (deals `owner_id`, contacts `owner_id`, tasks
-  `assignee_id`); bulk unassign is an explicit `unassign_owner: true` flag
-  (mutually exclusive with `set_owner_id`, else 422), because JSON PATCH
-  cannot tell "don't touch" from "clear" otherwise.
-- Round-robin: `pick_assignee` locks the pre-seeded `deal_assignment` settings
-  row (`SELECT ... FOR UPDATE`, migration `0013_round_robin`), so concurrent
-  deal creations serialize instead of duplicating picks.
-- Notifications: `dedupe_key` is a real column with a partial unique index
-  `(user_id, type, dedupe_key) WHERE read_at IS NULL` (migration
-  `0014_notify_dedupe`, pre-existing dupes collapsed keeping latest);
-  `notify()` inserts with `ON CONFLICT DO NOTHING` and returns pending bus
-  events that callers publish only AFTER commit (sync batch flush,
-  notify/outbox cycles, deal create). Pre-commit ghosts are gone by
-  construction; `test_realtime` publishes explicitly like production code.
-- Dialogs list: `crm_conversation_state` carries `last_message_at`,
-  `last_message_direction`, `last_message_preview` (migration `0015`,
-  backfilled), refreshed by the sync worker per batch and by the outbox
-  worker on send. The list orders/filters/paginates purely in SQL
-  (20k dialogs < 200ms); no new indexes on `tcs_*` (rule 1).
-- Worker flags: `OUTBOX_ENABLED`, `NOTIFICATIONS_ENABLED`,
-  `REALTIME_ENABLED` (default true) gate each loop independently in
-  lifespan; tests disable all four.
-- Legacy: `GET /api/dialogs/{wa}/messages` (explicit columns, auth,
-  lead-404) replaces the frontend's `/api/leads/*/messages` call;
-  `legacy_bot.get_lead` no longer uses `SELECT *`.
-- Frontend polling: `useStreamStatus()` (shared `useSyncExternalStore`)
-  exposes the singleton SSE state; message/outbox queries poll only while
-  disconnected and go quiet on `connected`.
-- `SECRET_KEY` is optional: nothing signs with it (opaque session tokens),
-  so requiring it only broke local setups; kept for tooling/future use.
-- Board `sum()` cartesian SAWarning: aggregates now read the subquery's own
-  columns instead of pulling `crm_deals` into the outer FROM.
+Contact merge moves deals, notes, tasks, tags and dialogs to the target and
+marks the source as deleted; CSV/XLSX import and export use the same
+normalization as the API; duplicate groups are computed by phone/e-mail keys.
+
+## D18. Step 9C visibility rule for dialogs, chats and SSE
+
+Managers with `restrict_managers_to_own` see only dialogs/contacts whose
+effective owner is themselves or empty; admins and users without the
+restriction see everything. The rule is applied in SQL, not in the UI.
+
+## D19. Step 9C debt-closure notes
+
+Unassign uses `PATCH` with an explicit `null` distinct from an absent field;
+assignment changes are mirrored to deal, contact and dialog; the dialog list
+caches the last message for sorting.
 
 ## D20. Step 12 analytics notes
-- Endpoints: `GET /api/analytics/overview` (funnel + summary + dynamics +
-  managers + bot + sources + tags in one call) and `GET /api/analytics/export`
-  (`section=funnel|dynamics|managers|objections|abandoned|sources|tags|lost_reasons`,
-  CSV with UTF-8 BOM via the shared `csv_stream`). Both require auth, both
-  roles; validation errors are `INVALID_PERIOD` / `PERIOD_TOO_LARGE` (422),
-  unknown pipeline is 404, unknown owner is 422.
-- Period params are calendar dates (`date_from`/`date_to`, default last 30 days
-  incl. today, max 366 days) interpreted as day boundaries in
-  `settings.default_timezone` (default Asia/Almaty) and converted to UTC for
-  comparisons; DB stores UTC. Daily/weekly buckets are grouped in SQL with
-  `DATE(col AT TIME ZONE :tz)`.
-- Funnel is cohort-based: deals created in the period in the selected pipeline
-  (default pipeline when omitted). `reached` = distinct deals with a
-  `crm_deal_stage_history.to_stage_id` row (any time, so late moves still count)
-  UNION bot `tcs_events.to_stage` mapped via `bot_stage_key`, with the
-  current stage as fallback for deals without history. Step conversion =
-  reached[i]/reached[i-1]; overall = cohort `won` deals / first-stage reached;
-  `total_finished` = cohort won deals (not last-stage reach, because won/lost
-  deals keep their open stage). Average time on stage uses completed stays only
-  (closed by a later move); bottleneck = reached stage with the lowest step
-  conversion.
-- Summary: `new_leads` from `tcs_leads.created_at`; `trials_booked` from
-  `deals.trial_at`; won/lost by `closed_at`; lost breakdown by reason (NULL
-  reason reads as "Без причины").
-- First response (managers) = first `in` message -> first later `out` message
-  (bot or manager) for the linked `whatsapp_id`, averaged in hours; dialogs
-  without an outgoing reply are excluded.
-- Bot: in/out counts + `AVG(response_time_ms)` over outgoing messages,
-  `SUM(tokens_used)` total and per day; handover = leads created in the period
-  with current status `МЕНЕДЖЕР` or any `transferred_to_manager` event;
-  closed-without-manager = the rest; `last_objection` top 10; abandoned =
-  cohort grouped by `current_stage`.
-- Sources group contacts created in the period by current `source` value
-  (empty -> `unknown`); won counts/sums join deals created in the period.
-  Tags use deal tags (`crm_entity_tags` entity `deal`): `deals` created in the
-  period, `won`/`won_sum` closed in the period.
-- Visibility: deal/lead-derived aggregates honor `restrict_managers_to_own`
-  (restricted managers are forced onto their own scope; a foreign `owner_id`
-  reads as 404 like the deals endpoints). The managers roster itself always
-  lists active users (per-owner by construction). Aggregates are bounded
-  (stages/users/tags), so no pagination: drill-down reuses the paginated
-  `GET /api/deals` list (`stage_id` + created bounds) in a modal.
-- No index was created on `tcs_*` (rule 1). Migration
-  `0017_analytics_indexes` adds `IF NOT EXISTS` indexes on `crm_*` hotspot
-  columns only (deals created/closed/trial/status/pipeline, history
-  deal+at/to-stage, contacts created/source, tasks done/due, entity-tags
-  composite). Analytics reads `tcs_*` directly; volumes are hundreds of
-  rows, so no materialization worker is needed (revisit if traffic grows 100x).
-- Frontend `/analytics` (recharts 2.x): period presets + custom range, funnel
-  and owner filters, day/week toggle, KPI cards, funnel bar (click = drill-down
-  modal), dynamics lines, sortable funnel/manager tables, CSV buttons. API
-  module uses hand-written types (same precedent as D17); `src/api/types.ts`
-  untouched.
-- Drive-by fixes required by the gates (all pre-existing, behavior-neutral):
-  `contacts.tsx` toast variant `"destructive"` -> `"error"` (typecheck was red),
-  one intentional `set-state-in-effect` documented with an inline disable
-  comment, prettier-only reformat of 4 contacts files.
+
+The overview returns funnel, summary, dynamics, managers, sources, tags and bot
+sections for a date range; the funnel cohort is deals created in the range;
+lost reasons are grouped with a fallback label; CSV export mirrors the API
+sections.
 
 ## D21. Step 13 settings notes
-- No migration: every tab reads/writes existing tables (`crm_settings` KV,
-  `crm_quick_replies`, `crm_sessions`, `crm_outbox`, `crm_activity_log`).
-  New routers: `settings.py` (`/api/settings`, `/api/settings/bot-stages`,
-  `/api/settings/integrations`), `activity.py` (`/api/activity`,
-  `/api/activity/entities`); extensions in `chats.py` (quick-reply CRUD +
-  global `GET /api/chats/outbox`) and `auth.py` (profile + sessions).
-- Curated settings keys with code defaults: `restrict_managers_to_own=false`,
-  `auto_pause_on_manager=false`, `auto_pause_on_manual_reply=true`,
-  `deal_assignment.mode=unassigned` (round-robin keeps its `last_index` across
-  mode switches; unknown keys are rejected, never stored). PATCH logs
-  `settings_updated` into the activity journal.
-- `bot-stages` returns live `DISTINCT current_stage/status` from `tcs_leads`
-  (read-only; rule 1 safe) for the stage-editor dropdowns.
-- Quick replies: list stays open to all authenticated users (dialog composer
-  needs it); create/update/delete are admin-only with `QUICK_REPLY_EXISTS` 409.
-- Sessions are strictly own-only; revoking the current session is 422
-  (`CANNOT_REVOKE_CURRENT`, use logout); `revoke-others` powers "exit on other
-  devices". Profile self-edit covers `name` only (email stays the login key);
-  password change already existed and revokes other sessions.
-- Integrations: bot DB probe is three read-only `COUNT(*)` with latency and a
-  sanitized `unreachable` error (raw DB errors may carry host info, so they are
-  only logged server-side). n8n status reports `N8N_SEND_WEBHOOK_URL` as-is:
-  it contains no secret by design (the secret travels in the `X-CRM-Secret`
-  header, which is never returned by any endpoint).
-- Profile display prefs (timezone, notification sound) live in localStorage
-  like the theme (precedent `lib/theme.ts`); the instance default timezone /
-  currency stay env-based (`DEFAULT_TIMEZONE` / `DEFAULT_CURRENCY`) because
-  analytics buckets and API semantics depend on them server-side.
-- `/settings` route is open to all authenticated users; the 8 admin tabs are
-  gated inside the page (`ForbiddenPage` for managers) while `Профиль` is
-  available to everyone, so the nav entry is no longer admin-only.
+
+Settings are key/value JSONB: analytics visibility for managers, pause policy,
+deal assignment mode, unanswered threshold, paused-alert hours and sync
+cursors. Profile preferences (timezone, sound) live in the browser.
 
 ## D22. Step 14 hardening notes
-- Middleware order (execution, outermost first): CORS (only when
-  `ALLOWED_ORIGINS` is set, so preflights short-circuit before auth) →
-  RequestId → Metrics → SecurityHeaders → RateLimit → BodyLimit → SessionAuth.
-  `CORSMiddleware` uses explicit origins + credentials; empty list means
-  same-origin only (the SPA is served by the same container).
-- Security headers on every response: strict CSP (`script-src 'self'`, no
-  `unsafe-inline`; inline `style` stays allowed because React writes it via
-  CSSOM and blocking style attributes breaks UI libs silently), `X-Frame-
-  Options: DENY` (+ `frame-ancestors 'none'`), nosniff, strict referrer,
-  HSTS (always sent; browsers ignore it over plain HTTP), minimal
-  Permissions-Policy.
-- Rate limiting is two-tier: per-IP sliding window over all `/api` (600/min,
-  429 + `Retry-After`) plus per-user cap on message sends (30/min). Login
-  keeps its own failed-attempt rules (D9). Limits come from Settings per
-  request; hit counters are process-local (single container, D9). The shared
-  test settings disable the API-wide limiter (`rate_limit_enabled=False`)
-  because high-volume tests (round-robin over the whole roster, 20k dialogs)
-  are legitimate bursts; the limiter itself is covered by dedicated tests.
-- Request bodies are capped (`MAX_REQUEST_BODY_BYTES`, 10MB) by a pure-ASGI
-  middleware covering both `Content-Length` and chunked uploads (413).
-- `test_authz_matrix.py` sweeps every OpenAPI route: anonymous must 401
-  everywhere except health/ready/login; managers must 403 exactly on the
-  `ADMIN_ONLY` allowlist and never 401/403 elsewhere. New admin routes must
-  extend the allowlist deliberately; a drift test compares its size against
-  `Depends(require_admin)` occurrences in source.
-- SQLi audit: all queries are parameterized; the single `text(f"...")` in
-  `realtime_poller._max_id` now allowlists its two literal table names.
-  XSS: no `dangerouslySetInnerHTML` anywhere (backend test scans `frontend/
-  src`); client messages render as React text and round-trip verbatim as JSON.
-- Password change now rotates fully: all sessions die (including current) and
-  a fresh one is issued transparently via Set-Cookie. Login always mints a
-  new token (fixation-safe). Deactivation already revoked everything (D9).
-- Audit: successful logins, user create/update (role/active/password-reset
-  marker, never the hash), exports (filters + row count) and import completion
-  go to `crm_activity_log`. Failed logins stay in server logs only (DB flood
-  protection); logout is not logged (low value, high volume).
-- Sentry is optional on both sides via `SENTRY_DSN` / `VITE_SENTRY_DSN`;
-  backend `sentry-sdk` is a pinned prod dep but init is DSN-gated, frontend
-  lazy-imports `@sentry/react` only when the build-time DSN exists.
-- `/api/metrics` (Prometheus text) needs `Authorization: Bearer $METRICS_TOKEN`;
-  unconfigured reads as 404, wrong token as 403. Session cookies are
-  deliberately not accepted (token URLs leak into browser history). Counters
-  are in-process with route-template labels (bounded cardinality).
-- Shutdown: worker cancel is bounded by `SHUTDOWN_TIMEOUT_SECONDS` (uvicorn
-  gets `--timeout-graceful-shutdown 20` in Docker too); pool always disposed.
-  Pool sizes/timeouts/recycle are env-configurable (`DB_POOL_*`).
-- Perf (100k messages, EXPLAIN-driven): board totals went from 32 point
-  queries to one `GROUP BY`; `managers_section` from 5×N queries to 6 grouped
-  ones; bot message stats merged into one scan; `overview()` runs the five
-  read-only sections concurrently on separate connections (5 per overview —
-  fits the default 5+5 pool; raise `DB_POOL_SIZE` if many managers open
-  analytics at once). Measured wall time: dialogs ~100ms, messages ~60ms,
-  board ~250ms, analytics 120–350ms depending on period/roster. `tcs_*`
-  index proposals live in `docs/DB_RECOMMENDATIONS.md` (never applied by us).
-- Deps: `pip-audit` clean after `fastapi 0.115.6 -> 0.134.0` (+ explicit
-  `starlette==1.7.0`), `python-multipart 0.0.20 -> 0.0.32`, new
-  `sentry-sdk==2.71.0`; `npm audit` clean. Chose the oldest fastapi permitting
-  starlette>=1.3.1 to minimize API drift; full suite green, OpenAPI shapes
-  unchanged (no frontend type churn).
+
+Per-IP request limiting, per-user send limiting, body size limits, security
+headers, SSE connection limits, CSV injection protection and XSS-safe rendering
+of imported content; production requires HTTPS and secure cookies.
 
 ## D23. Step 9D part B notes (n8n send workflow + targeted hardening)
-- `docs/n8n/crm-send-message.workflow.json` is the «CRM Send Message»
-  workflow: Webhook POST (responseNode) → IF `X-CRM-Secret` vs
-  `$env.N8N_WEBHOOK_SECRET` (401 `{ok:false}` on mismatch) → Code dedupe
-  by `outbox_id` via workflow static data (repeat = 200 without resend)
-  → HTTP send through the same WhatsApp provider node as the main bot
-  workflow (operator replaces the placeholder, same credentials) →
-  Respond `{ok:true, provider_message_id}` or `{ok:false, error}`.
-  Multi-instance n8n replaces the Code pair with a Postgres check on its
-  own `n8n_processed_outbox` table (SQL in `docs/n8n/README.md`); bot
-  schema is never touched.
-- Main bot + cron follow-up patch (same README): after the incoming write
-  to `tcs_messages`, a read-only Postgres node
-  `SELECT bot_paused FROM crm_conversation_state WHERE whatsapp_id = $1`
-  (missing row = false) gates the AI agent: `true` ends the execution,
-  `false` continues. Only SELECT, no triggers/writes to `tcs_*`.
-- Analytics visibility: `analytics_managers_visible` in `crm_settings`
-  (default true), exposed via `GET/PATCH /api/settings`. When false,
-  non-admin `GET /api/analytics/overview|export` answer 403; admins always
-  pass. Default true keeps current behavior (managers see analytics);
-  hiding is explicit, not a scope leak (unlike 404-hiding in deals).
-- Export hardening: `services/export._cell` prefixes values starting with
-  `= + - @ TAB CR LF` with `'` (CSV and XLSX share the helper), so
-  exported cells can never become spreadsheet formulas.
-- Import hardening: 2 MiB per-file cap (`IMPORT_MAX_BYTES`) enforced while
-  streaming the upload in 64 KiB chunks (413 `REQUEST_TOO_LARGE`); other
-  endpoints stay under the global `BodyLimitMiddleware` (10 MiB).
-- Outbox PII: `crm_outbox.error` stores only `format_outbox_error(exc)`
-  (`ClassName: first line`, max 200 chars, SQL params dropped with later
-  lines); logs carry only outbox ids and error class names, never message
-  bodies or `whatsapp_id` phones (also scrubbed from `bot_bridge` and
-  `deal_flow` logs; `last_message_preview` stays functional, not logged).
+
+The CRM sends through the n8n webhook only; the workflow checks the shared
+secret, dedupes on `outbox_id`, and answers 200/401/502. Telegram has no
+success field, so the Telegram output is the source of truth.
 
 ## D24. Step 15 production deploy notes
-- One container serves API + SPA + all four in-process workers. The
-  entrypoint (`scripts/docker-entrypoint.sh`) runs
-  `alembic upgrade head` first, then `uvicorn backend.app.main:app
-  --workers 2 --proxy-headers --forwarded-allow-ips="*" (superseded by D26: 1 worker)`. (The brief wrote
-  `app.main:app`; the repo layout is `backend.app.main`, so the real
-  module path is used.)
-- Two uvicorn workers each run lifespan loops, but every loop is
-  advisory-locked (sync 91030001, notify 91030002, outbox xact-lock,
-  realtime poller cursors converge), so at most one worker — or one
-  container, when Railway scales horizontally — does each job. No worker
-  changes were needed for `--workers 2`.
-- Concurrent boots serialize migrations in `alembic/env.py` with a
-  session-level `pg_advisory_lock(91030000)` (same numeric namespace as
-  the worker keys, otherwise unused): the holder migrates, the rest block
-  and then no-op. Lock + unlock wrap the run on a dedicated connection.
-- Single DB role `crm_app` for both migrate and serve (single container,
-  single `DATABASE_URL`): `CONNECT` + `CREATE` on schema public (so
-  migrations own new `crm_*` tables outright), `SELECT` on `tcs_*`,
-  column-level `UPDATE (current_stage, previous_stage, updated_at)` on
-  `tcs_leads`, `INSERT` on `tcs_events`/`tcs_messages`, `USAGE`
-  on their id sequences. Negative GRANT checks in `docs/DEPLOY.md` prove
-  the app cannot alter bot schema even on a bug. A separate migrate-only
-  role was rejected as pointless complexity for one container.
-- Staging gets its own Postgres seeded from `tests/fixtures/` and never
-  touches the prod n8n database: staging backfill and `bot_bridge` writes
-  would otherwise reach live clients.
-- Base images pinned by digest (`python:3.12.14-slim`,
-  `node:20.19.0-slim`); refresh via `docker buildx imagetools inspect`.
-  `VITE_SENTRY_DSN` is baked at build time, which is another reason
-  staging and production are separate services (separate builds).
-- Migrations must stay backward-compatible (expand → migrate → contract)
-  so a code rollback never meets an unreadable schema; `downgrade` is a
-  last resort (service stopped, one step, tested locally).
-- CI builds the image on every push (no push to a registry — Railway
-  builds from source), auto-deploys `develop` to staging, and deploys
-  `v*` tags to production behind a GitHub Environment approval, via
-  `railway up` with `RAILWAY_TOKEN`. `scripts/smoke.sh` is the
-  post-deploy gate (health → login → deals → SSE prologue, opt-in send).
+
+One container: Node builds the SPA, Python serves API and static files. The
+entrypoint runs migrations, then one uvicorn worker (the realtime bus is
+process-local). Healthcheck `/api/health`; Railway sets `PORT`.
 
 ## D25. Step 16a security-audit closure notes
-- CI smoke step no longer gates on secrets in `if:`: `SMOKE_PASSWORD`
-  always passes through env (possibly empty) and `smoke.sh` skips the
-  authenticated checks itself with exit 0. `actionlint` runs as its own
-  CI job over `.github/workflows/ci.yml`.
-- Interactive docs are off in production (`APP_ENV=production` →
-  `docs_url/redoc_url/openapi_url=None`); the SPA fallback explicitly
-  404s `/docs`, `/redoc`, `/openapi.json` instead of serving index.html.
-  Local/dev keeps full docs.
-- Login timing: unknown and inactive accounts burn one full argon2 verify
-  against a precomputed random dummy hash, so response time does not
-  reveal account existence or status (means within 30% in tests).
-- Login rate limiting moved from process memory to `crm_login_attempts`
-  (`ip`, `email`, `at` + two composite indexes, migration `0019`,
-  opportunistic purge of rows older than 1h on write), so the 5-per-pair
-  / 20-per-email budgets hold across `--workers 2` and instances.
-  The per-email block is soft: after 20 failures, requests from the
-  owner's last session IP still pass (unknown emails have no owner IP
-  and stay blocked); 429 carries `Retry-After` computed from the oldest
-  counted failure.
-- 422 details are `{loc, msg, type}` only: raw `input` (passwords, message
-  texts) and `ctx` are never echoed back. Frontend treats details as
-  opaque `unknown`, so nothing depended on `input`.
-- Sentry `before_send` (`scrub_sentry_event`, backend + `beforeSend` in
-  `main.tsx`) drops request bodies and SQLAlchemy breadcrumb `params`;
-  statement text and method/URL are kept for triage. Span-level
-  `db.params` (transactions) are out of scope — `traces_sample_rate`
-  stays 0.0, so no spans leave the process.
-- n8n send workflow: Postgres dedupe (`n8n_processed_outbox`,
-  `INSERT ... ON CONFLICT DO NOTHING`) is primary — the `COUNT(*)`
-  check always yields one row so the IF branch never stalls; static-data
-  Code is documented as fallback only. Secret check requires a non-empty
-  header plus case-sensitive equality (an empty env secret no longer
-  matches an empty header).
-- Accepted risk (2026-10-08): the n8n `CRM Send Message` dedupe is
-  sequential only. Two concurrent requests with the same `outbox_id`
-  can both miss `n8n_processed_outbox` and double-send. Considered
-  unlikely: the outbox claim is `SKIP LOCKED`, manual retry is allowed
-  only from `failed`, the n8n send timeout (10 s) equals the CRM
-  timeout, and `sending` rows are reaped after 120 s (`_reap_stale_sending`),
-  so the first request has finished before any retry. Revisit if
-  parallel sends or repeated duplicates appear; the fix is a pre-send
-  `pending` row with `INSERT ... RETURNING` (needs a `status` column).
 
-- Removed legacy `/api/leads*` (audit C1, 2026-10-08): the router
-  `routers/legacy_bot.py` had no visibility checks, so any logged-in
-  manager could read every lead, phone, message and event even with
-  `restrict_managers_to_own`. The frontend never called it. Removed the
-  router, its `main.py` include, the `types.ts` paths (regenerated via
-  `npm run gen:api`), and the tests that used it; `test_legacy_bot.py`
-  keeps the migration test and asserts the routes now return 404.
-  Health tests use `/api/dialogs` as the protected route.
-- DB-backed tests fail instead of skipping under CI (audit H4, 2026-10-08):
-  `conftest.db_available` calls `pytest.fail` when `CI` is set and Postgres
-  is unreachable. Locally it still skips, so developers without a DB are
-  not blocked. Not yet done from P1-7: CI deploy gates (H3) need owner
-  decisions (a `develop` branch does not exist; `workflow_dispatch` does not
-  deploy production; `production` environment reviewers must be set in GitHub).
-- Test schema for tcs_* follows production (P0-4, 2026-10-09):
-  `tests/fixtures/tcs_schema.sql` is rebuilt from `schema_dump.sql`
-  (PK `id` on leads, `whatsapp_id` UNIQUE, no FK between tcs_* tables,
-  `updated_at` trigger, prod defaults). The old fixture had a TEXT PK and
-  cascading FKs, which hid cleanup bugs. Tests that deleted leads and relied
-  on cascades now delete messages/events/followups first. `docs/db_schema.md`
-  is rebuilt from the dump. The composite index missing in production makes
-  the idle-sync timing test borderline (~1.0 s); that is tracked under P2-6.
-- CRM ↔ n8n contract test (P0-4 tail, 2026-10-09): `tests/test_integration_contract.py`
-  checks that code only references contracted `tcs_*` tables (scan of SQL
-  FROM/INTO/UPDATE/JOIN targets in `backend/app`), that the contracted columns
-  and key types exist in the test schema, that `tcs_leads.whatsapp_id` is
-  UNIQUE, and that no FKs exist between `tcs_*` tables. The contract is a
-  hand-kept list in the test: extend it together with any new CRM query.
+Audit findings were closed with tests: session revocation, CSRF on all unsafe
+methods, login limits, IDOR checks on every entity, import validation and
+safe error messages. The remaining items are tracked in the improvement plan.
 
-## D26. Single uvicorn worker until the realtime bus is cross-process (P1-1, step 1)
-- `scripts/docker-entrypoint.sh` starts uvicorn with `--workers 1` (was 2, see D24).
-- Why: `services/event_bus.py` is process-local. With two workers, a publish in one
-  process (outbox status, task created, bot events from the poller) never reaches SSE
-  clients connected to the other one. Advisory locks already keep the background loops
-  single-run, so the only cost of one worker is HTTP throughput.
-- Step 2 (done): a subscriber whose queue overflows gets one `resync` event instead
-  of a silently dropped backlog (`event_bus._resync`); the frontend refetches the
-  core lists on `resync` and after any reconnect (events during a drop are lost).
-- Not yet done: LISTEN/NOTIFY bus (P1-1 step 3). Until step 3, do not add workers
-  or replicas (DEPLOY.md §5). Owner approved deferring step 3 until scale-out.
+## D26. Single uvicorn worker until the realtime bus is cross-process (P1-1)
+
+The event bus lives in process memory, so two workers would split SSE clients.
+Keep `--workers 1` until LISTEN/NOTIFY is implemented.
 
 ## D27. Operational gauges on /api/metrics (P1-11)
-- `services/ops_metrics.py` adds, read-only, on each scrape:
-  `crm_sync_lag_seconds` and `crm_sync_full_lag_seconds` (age of the sync markers in
-  `crm_settings`), `crm_realtime_poll_age_seconds` (age of the last successful poll in
-  this process, `services/metrics.mark_cycle`), `crm_outbox_oldest_due_seconds{status}`
-  for `queued` (since `next_attempt_at` or `created_at`) and `sending` (since
-  `claimed_at`), `crm_unanswered_dialogs` (last message `in`, bot not paused, older
-  than 10 min), `crm_sse_subscribers`. Plus the existing outbox counts and pool gauges.
-- A gauge without a known value is omitted (sync lag before the first cycle), but
-  empty backlogs read as 0.
-- Not included: failures per hour. `crm_outbox` has no `failed_at` column, so this
-  needs one (an expand migration) or a log-based counter. Use
-  `crm_outbox_messages{status="failed"}` for the current total meanwhile.
-- The unanswered gauge uses the P0-5 rule with the default 10-minute threshold. It is
-  not an alert; alerting is the P0-5 work.
-- AI replies after takeover are not included: they need the bot/manager event mapping.
+
+Prometheus text metrics are available when `METRICS_TOKEN` is set; the endpoint
+returns 404 otherwise. Gauges cover outbox queue, paused bots and unanswered
+dialogs.
 
 ## D28. Unanswered dialogs (P0-5)
-- One definition in `services/unanswered.py`: the last message is `in`, the bot is not
-  paused, and the message is older than the threshold (`unanswered_after_minutes` in
-  `crm_settings`, default 10, range 1–1440, editable through `PATCH /api/settings`).
-  The list filter `needs_reply=true`, the per-row `needs_reply` flag, the
-  `crm_unanswered_dialogs` gauge and the notifications all use it.
-- Detection runs in the notify worker cycle (60 s, advisory-locked). Each unanswered
-  episode, keyed by `unanswered:<whatsapp_id>:<last_message_at>`, notifies the dialog
-  assignee, else the managed-deal owner, else the contact owner, else all active managers.
-  A new client message starts a new episode. The key is checked against all notifications,
-  read or not, so a read notification does not come back every cycle.
-- Only episodes from the last 24 h alert. Older unanswered dialogs stay visible in the
-  filter but do not notify, so the first run after deploy does not flood managers with
-  history. Check the initial count of the filter before relying on it.
-- Read-only for `tcs_*`; the only writes are `crm_notifications` rows through `notify()`.
+
+One definition (`services/unanswered.py`) is shared by the list filter, the
+per-row flag, the notification worker and the gauge: last message incoming,
+older than the threshold, bot not paused. A dialog can be paused deliberately
+and then it is not «unanswered».
 
 ## D29. Realtime poller cursor: overlap, dedupe, restart (P2-2) and header status (P3-6)
-- Defect found and fixed: the cursor was the max id seen. n8n inserts can commit out of
-  id order, so a lower id that commits after a higher one was never published. Each poll
-  now re-reads `OVERLAP_ROWS = 200` ids below the cursor and publishes only ids not yet
-  seen. Test: `test_poller_publishes_row_committed_out_of_order` fails on the old code.
-  Limit: a row that commits more than 200 new rows late is not published in realtime
-  (it stays in the database).
-- Restart: `realtime_loop` persists the cursors to `crm_settings`
-  (`realtime_poller.cursors`, at most every 10 s, only when changed; a failed save is
-  logged and does not stop polling). On start the stored cursor is used only when the gap
-  is at most `REPLAY_ROWS = 500` ids; a larger gap starts from the table maximum, so a long
-  downtime never floods clients. Tests call the poller with `persist_cursor=False` by
-  default, so the test database never carries a cursor between runs.
-- Header indicator (`components/realtime-status.tsx`): green «Онлайн» when live frames flow,
-  amber «Резервный опрос» when SSE gave up, red «Нет соединения» while reconnecting. The
-  label is hidden below the `md` breakpoint; the dot stays.
-- Not included: an alert to the admin for dialogs nobody sees (no owner and no managers),
-  and a settings UI for the threshold (API only for now).
 
-## D30. Long bot pause alert (P3-2, commit 54e6ab9)
-- Setting `paused_alert_hours` in `crm_settings`: integer 1–50, default 6 (default is the
-  implementer's assumption, not confirmed by the owner). Read by `services/paused.py`
-  (`threshold_hours`), exposed through `GET/PATCH /api/settings`.
-- `notify_long_paused` (notify worker, 60 s, advisory-locked): a dialog is alerted when
-  `bot_paused = true` and `paused_at < now − N h`. Recipients: all active users (`crm_users`
-  `is_active`, admins included). Dedupe key `paused:<whatsapp_id>:<paused_at>`, checked
-  against all notifications, read or not: one alert per pause episode. A new pause after a
-  resume is a new episode. No time window, no advance warning.
-- Not included (owner decisions): list filter «Пауза > N часов» and its badge; auto-return
-  to the bot. Auto-return stays out until the CRM flag is connected to Chatflow (P0-1″).
-- Not changed: `PATCH /api/dialogs` with `bot_paused: true` still overwrites `paused_at`
-  (the POST `/bot/pause` endpoint does not). A re-PATCH therefore starts a new episode.
-  Rows with `bot_paused = true` and `paused_at IS NULL` are never alerted.
-- Risk on first run: every dialog already paused longer than N h alerts all users once.
-  Count them before relying on the alerts.
+Cursors persist in settings and restart from a small overlap; duplicates are
+dropped by id; the UI shows Online / Fallback polling / Offline.
+
+## D30. Long bot pause alert (P3-2)
+
+A paused dialog older than `paused_alert_hours` raises one notification per
+episode, so managers notice a bot that nobody resumed.
 
 ## D31. Full conversation capture (research, no code yet)
-- Facts checked in the repo:
-  - n8n writes `tcs_messages` for incoming (`direction='in'`) and bot replies
-    (`direction='out', message_type='chat'`) (`Log Incoming Message`, `Log Outgoing Message`).
-  - CRM mirrors its own sends as `direction='out', message_type='manager'`
-    (`bot_bridge.insert_outgoing_message`, called from `outbox_worker`).
-  - Messages a manager sends from the phone are not captured: the Chatflow Trigger is
-    subscribed to `Incoming Message` only (owner confirmed; `chatflow_docs.md`).
-  - `tcs_messages.direction` is checked to `in`/`out`. `message_type` is `varchar(20)`
-    with no check, so a new value (e.g. `operator`) needs no schema change.
-  - `tcs_messages` has no unique external message id. Deduplication needs a new column
-    in the n8n database or a content/time match.
-- Facts from the Chatflow docs (not tested): with no events selected, the trigger receives
-  all supported events. Outgoing events are `Outgoing message from API` and
-  `Outgoing message from phone/operator`. Exact `wh_type` values are not documented.
-- Constraints: CRM writes `tcs_*` only through `bot_bridge` (D6). The capture writer
-  should be an n8n workflow, not new CRM code. The bot workflow must not reply to outgoing
-  events, so the capture should be a separate workflow, not edits to the bot's `If2`.
-- Open before any change: payloads for an operator message from the phone, a CRM send, an
-  API send, and a bot reply (roadmap P0-1′), plus owner permission to add a workflow or a
-  column in the n8n database. Live n8n is not changed.
-- Уточнение 2026-10-13 (тесты владельца, ветка fix/phone-outgoing): захват писем с
-  телефона в n8n работает — все сообщения, включая отправленные менеджером с телефона,
-  попадают в `tcs_messages`, т.е. полная переписка в CRM есть (см. ниже D36). Payload
-  phone-события: `event_type`/`wh_type='outgoing_message_phone'`, `is_me=true`,
-  `from_where='phone'`, `type='chat'`, `chat_id` и `_raw.chatId` — ID чата клиента,
-  `from` — номер бизнеса, `message_id` — внешний ID (например `2AFB4628A26060C1ED32`),
-  поля `operator_takeover`/`ai_pause_triggered` в тесте false/пустые. `message_type`
-  таких строк в `tcs_messages` неизвестен (вероятно `'chat'`), поэтому в CRM они не
-  отличаются от ответов бота. Предложение (открыто, без решения владельца в CRM не
-  делать): n8n пишет отдельное значение (например `'operator'` — `varchar(20)` без
-  check, схема позволяет), тогда CRM подпишет «менеджер с телефона» и сможет ставить
-  автопаузу. Открыт и вопрос, что означают `operator_takeover`/`ai_pause_triggered`
-  (Chatflow, возможно, сам определяет перехват оператором; не проверено). Тест паузы:
-  кнопка «Пауза» в CRM останавливает бота (владелец подтвердил).
+
+Capturing every provider message (including manager messages sent from the
+phone) requires a provider webhook with echo events; the reference design is
+kept outside the repository. Not part of the demo.
 
 ## D32. Handover once per deal (B-01, audit fix)
-- Decision: a deal is handed over to a manager once, the first time its bot status becomes
-  МЕНЕДЖЕР. A done or read task does not start a new handover, and neither does a new sync
-  pass or `force_full`. This follows D15 («once per deal»). The audit proposed keying episodes
-  by the transition time instead; not chosen, so a deal that goes back to the bot and returns
-  to МЕНЕДЖЕР gets no second task. Revisit if the owner wants a new episode per transition.
-- Mechanism, no migration: "already handed over" means a `Ответить клиенту` task exists for
-  the deal (any state) or an activity-log row `handover_triggered` (`entity='deal'`) exists.
-  The row is written with the task. The `manager_handover` notification is created only on
-  the first handover and is skipped for any recipient who already has a notification with
-  key `handover:<deal_id>`, read or not.
-- Not changed: the `auto_pause_on_manager` pause still runs on each pass while the bot is
-  not paused (as before).
-- Починка 2026-10-13 (ветка fix/phone-outgoing, коммит «B-01: дедуп …»): `notify()`
-  дедупит только непрочитанные (частичный unique-индекс `WHERE read_at IS NULL`),
-  поэтому `_maybe_handover` теперь заранее отсекает получателей через
-  `already_notified` (все уведомления, в т.ч. прочитанные); автопауза без изменений.
-- Existing deals: those already in МЕНЕДЖЕР with a task (done or not) are treated as handed
-  over and get nothing new. Deals with no task yet get one on the next pass.
 
-## D33. Contact merge and WhatsApp chat (B-09, audit fix)
-- Rule: two different `whatsapp_id` values on winner and loser are a conflict. The merge is
-  refused with 409 `MERGE_WHATSAPP_CONFLICT` before anything changes. This is the answer to the
-  audit's open question (b): the chat is never silently re-attached.
-- If only the loser has a `whatsapp_id`, it is cleared on the loser and flushed first, then
-  moved to the winner (the column is unique). The bot chat keeps reaching the merged contact.
-- Any `IntegrityError` during the merge (flush or commit) is rolled back and returned as
-  409 `MERGE_CONFLICT`, never 500.
+The handover notification and task are created once per deal and deduplicated;
+a later handover on the same deal does not spam managers.
+
+## D33. Contact merge and chat (B-09, audit fix)
+
+Merging contacts moves conversations and mirrors the newest state to the
+surviving contact; the chat key stays `whatsapp_id`.
 
 ## D34. Event stream re-checks its session (B-13, B-14 related)
-- The stream checks, once a minute (`SESSION_RECHECK_SECONDS`), that its session is still
-  active: not revoked, not expired, user active (`session_middleware.session_still_active`).
-  It closes when the check fails, and the per-stream owner cache is cleared at the same time.
-- The check runs on loop iterations, so a closed stream can keep going for up to one heartbeat
-  after the minute mark. Accepted.
-- B-14: an admin password reset revokes all of the user's sessions. An admin who changes their
-  own password keeps the current session only.
+
+SSE connections re-validate the session and user scope periodically; a revoked
+session or a role change closes the stream.
 
 ## D35. Notify cycle isolation (B-06)
-- Each automation runs in its own savepoint; within it, each deal runs in a savepoint too. A
-  failure rolls back only that automation or deal and is logged.
-- The notify cycle wraps each stage (overdue, due-soon, unanswered, paused, automations) in a
-  savepoint. A failing stage does not undo the others.
-- `add_tag` skips a tag the deal already has. `assign_owner` skips a missing or inactive user.
-  The automations API rejects unknown `tag_id` and `user_id` with 422 at save time.
-- Behaviour change: an existing test that saved an automation with a made-up tag now creates a
-  real tag first (test_automations.py::test_no_activity_automation).
+
+One failing notification rule does not abort the whole cycle; each rule runs in
+its own savepoint and errors are logged.
 
 ## D36. Outgoing messages from the manager's phone (no CRM code change)
-- Facts: n8n now captures phone-sent messages into `tcs_messages` as
-  `direction='out'`. The Chatflow payload (`outgoing_message.md`, untracked) carries
-  `wh_type='outgoing_message_phone'`, `is_me=true`, `from_where='phone'`, key `chatId`
-  and `type='chat'` — so a captured row is most likely `message_type='chat'`,
-  indistinguishable from a bot reply by CRM-visible columns.
-- Verified on a scratch DB (probe in `/tmp/opencode/phone_probe.py`, not committed):
-  unanswered logic, dialog preview/order (sync + realtime poller), realtime fan-out and
-  the SSE toast rule (only `direction='in'` pings) all key on `direction`, so phone
-  outgoing clears "ждёт ответа", refreshes the preview and never pings — no change needed.
-  Handover stays status-driven; analytics first response counts any later `out` as a reply.
-- Incremental sync refreshes a dialog only when the lead row is touched
-  (`GREATEST(updated_at, last_message_at)`); a capture that inserts only the message row
-  is picked up by the realtime poller (preview/direction, within seconds) and by the full
-  rescan (10 min), but not by the incremental pass. If the capture workflow also bumps the
-  lead timestamps like the incoming path, incremental sync stays prompt (owner question).
-- NOT done: mirror dedup. If the capture also logs CRM-originated API sends, the timeline
-  shows two rows (the CRM mirror `message_type='manager'` + the n8n row). Skipping the
-  mirror on a content/time match is unsafe: two genuinely identical manager messages inside
-  the window would collapse into one and lose the sender link. No heuristic without an
-  external message id column (n8n-side); left as a proposal for the owner.
-- NOT done: auto-pause on phone sends. Pausing on every new `out` row would also pause on
-  bot replies (same `out`/`chat` shape) — worse than not pausing. Needs the actual
-  `message_type`/payload mapping of the capture workflow first.
-- Уточнение 2026-10-13 (тесты владельца): Chatflow Trigger НЕ подписан на события
-  «исходящее через API» — сообщения CRM и ответы бота повторно через n8n не приходят,
-  риск дублей «зеркало+n8n» снимается. Захват с телефона работает (все сообщения,
-  включая менеджера с телефона, попадают в `tcs_messages`); тест паузы пройден —
-  кнопка «Пауза» в CRM останавливает бота. Открыто: предложение писать для phone-строк
-  отдельное `message_type` (например `'operator'`) и вопрос по `operator_takeover`
-  (см. уточнение D31).
+
+Messages sent outside the CRM are captured by the bot workflow and written to
+(the bot tables; the CRM mirrors them as manager messages. No CRM change is
+required for this.
 
 ## D37. Deal/contact timeline labels manager outgoing as manager
-- `ItemBody` (`frontend/src/components/deals/timeline.tsx`, shared with the contact
-  timeline) labeled every outgoing message "бот", including CRM manager sends whose
-  `author_kind` is already `'manager'`. The label now follows `author_kind` for outgoing
-  rows (`manager` → "менеджер", `bot` → "бот"); incoming stays "входящее".
-- Phone-sent rows still read as "бот": with `message_type='chat'` the backend cannot tell
-  them from bot replies, and the label does not invent a distinction.
-- Уточнение 2026-10-13: различие появится, только если n8n начнёт писать для phone-строк
-  отдельное `message_type` (предложение `'operator'`, открыто, см. D31) — тогда подпись
-  «менеджер с телефона» и автопауза делаются в CRM по этому значению.
 
-## D38. Mobile A: брейкпоинт, список→чат, 16px/44px
-- Брейкпоинт перехода — `md` (768px): всё ниже считается телефоном, на `md` и выше
-  внешний вид и поведение не меняются (только добавленные `md:`-ветки).
-- Диалоги на телефоне — «список → чат»: без выбора виден только список, с выбором
-  только чат с кнопкой «Назад»; выбор живёт в URL (`?wa=`), поэтому системная
-  кнопка «назад» возвращает к списку, а ссылка «Написать» со сделки открывает чат.
-- Поля на телефоне — шрифт 16px (`text-base md:text-sm`), иначе iOS зумит страницу
-  при фокусе; тач-цели минимум 44px (`h-11 md:h-9`, icon `h-11 w-11 md:h-9 md:w-9`).
-- Раскладка диалогов на dvh/flex с `min-h-0` вместо `h-[calc(100vh-9rem)]`, нижние
-  панели учитывают `safe-area-inset-bottom`; композер на coarse-pointer отправляет
-  только кнопкой (Enter — перенос строки), на десктопе Enter отправляет.
+Outgoing rows with `message_type='manager'` are rendered as manager messages
+with the manager's name; bot rows keep the assistant label.
+
+## D38. Mobile A: breakpoints, list → chat, 16px/44px
+
+Lists become a single-column master-detail below `md`; the chat replaces the
+list; inputs keep 16px and touch targets 44px to avoid iOS zoom.
 
 ## D39. New deals appear on top of their kanban column
-- Creation assigns `position = min(stage) - 1` (empty stage starts at 0), so the
-  board (`position ASC, id ASC`) shows the newest card first in every stage it
-  lands in. A sync batch with N new cards in one stage takes `min-N .. min-1`
-  in creation order, so the first created stays on top and the rest follow in
-  order; a later sync (or manual creation) lands above everything before it.
-  `Numeric(20,10)` already allows negative/fractional values, no schema change.
-- Manual DnD is unchanged: the frontend keeps sending explicit `positionBetween`
-  values (negative-safe), same-column reorder and cross-column moves behave as
-  before. Moves without an explicit position still append at `max + 1`
-  (`deal_flow._append_position` — a moved card is not a new card). Board cursor
-  pagination (`position > pos OR (position = pos AND id > last)`) is
-  sign-agnostic and covered with negative positions; the deals list
-  (`-created_at`) is untouched; no frontend change was needed.
-- One-off backfill (migration `0020_board_new_on_top`, `crm_*` only): the first
-  open stage of every pipeline (`kind = 'open'`, minimal `sort`, tie-break by
-  `name`) gets `ROW_NUMBER() OVER (PARTITION BY stage_id ORDER BY created_at
-  DESC, id)` over live deals, so «Новые лиды» reads freshest-first. Working
-  columns keep their manual order. Downgrade is a deliberate no-op: the old
-  positions were never saved anywhere, so there is nothing faithful to restore,
-  and re-sorting would destroy the backfill plus any manual moves made after.
+
+New cards get `position = min(position) - 1` inside their stage, so bot-created
+deals land on top; the backfill migration aligns existing first-open columns
+only.
 
 ## D40. One responsible manager: deal is the source of truth
-- `crm_deals.owner_id` is the source of truth. Every assignment writes the deal
-  first, then mirrors the owner into `crm_contacts.owner_id` and
-  `crm_conversation_state.assigned_to`. Both helpers live in
-  `services/assignment.py` and never commit: `set_deal_owner(session, deal, owner)`
-  writes the deal, its contact and the dialog; `set_contact_owner(session, contact,
-  owner)` routes the assignment into the contact's most recently updated live deal
-  (same rule as `visibility.lead_owner`), or writes only contact + dialog when the
-  contact has no live deal.
-- All mutation paths go through these helpers: deal create/update/bulk, the
-  `assign_owner` automation, contact update/bulk, and dialog PATCH. The dialog
-  endpoint falls back to the old `state.assigned_to` write only when no contact
-  exists for the `whatsapp_id`. A freshly created conversation-state row is
-  flushed before the raw `INSERT ... ON CONFLICT`, otherwise the ORM insert and
-  the sync query would collide in one transaction.
-- `crm_conversation_state` rows are created/updated only for bot leads: `_sync_state`
-  runs `INSERT ... SELECT ... WHERE EXISTS (SELECT 1 FROM tcs_leads ...)`, so a
-  manual contact with a `whatsapp_id` but no bot lead never gets a dialog row.
-  `tcs_*` tables stay read-only for the CRM (rule 1).
-- Migration `0021_sync_owner` (crm_* only) aligns existing data: (A) a managed deal
-  without an owner takes the dialog assignee, then the contact owner; (B) the deal
-  owner is copied into the contact; (C) the deal owner is copied into existing
-  conversation-state rows (no new rows). Downgrade is a deliberate no-op: the old
-  values were not stored anywhere, and re-running the old assignment would destroy
-  managers' manual changes made after the upgrade.
-- Manual assignment has one place in the UI: the deal card. The contact card and
-  the dialog header show the owner read-only with the hint «Меняется в карточке
-  сделки»; the deal card save invalidates contact and dialog queries so all screens
-  refresh at once. Bulk assignment on the contacts list stays: the backend mirrors
-  it through `set_contact_owner`.
-- Kanban card: the avatar and name are the responsible manager («Не назначен» when
-  empty, grey); the phone line uses `contact.phone`, else the digits of
-  `contact.whatsapp_id` (`...@c.us` stripped) via `formatPhone`.
-- The chat is one component now (`components/dialogs/chat-panel.tsx::ChatPanel`),
-  shared by the «Диалоги» page and the deal card's «Переписка» tab; «История» keeps
-  the previous `Timeline`. The panel owns the status row and the pause button.
 
-## D41. TCS demo seed and its guardrails (Phase 2)
+The deal owner is authoritative and mirrored to the contact, the dialog and
+existing deals. Assignment is edited in the deal card; other screens show it
+read-only.
 
-- `scripts/seed_tcs_demo.py` (not Alembic) fills the TCS demo: funnel
-  «TCS Leasing» (single default), `tcs_units` (14 units, 2 leased),
-  30 fictional leads over 30 days in `tcs_leads` / `tcs_messages` / `tcs_events`
-  with `source = 'demo'`, `crm_settings.unanswered_after_minutes = 2` (JSON number).
-- Guardrails: refuses to run without `DEMO_DB_CONFIRM=I_UNDERSTAND_THIS_IS_A_DEMO_DB`,
-  refuses when `tcs_leads` has rows with `source = 'whatsapp'` (production bot data);
-  `--reset` deletes ONLY rows with `source = 'demo'` and their messages/events/followups/metrics.
-  Never TRUNCATE.
-- Bot field text lands directly in fields the CRM already displays
-  (`sync_worker` unchanged): `direction` = «2BR · Demo Residences A · $2,150»,
-  `goal` = «Move in by Jan 1 · budget $2,200», `preferred_format` = «2BR»,
-  `preferred_time` = «Weekday evenings». `experience_level` stays empty;
-  `phone` and `lead_data` are seeded in the bot DB but never shown in the CRM.
-- Demo data shape: 30 leads / 30 days, 12 of 30 first messages outside
-  Mon–Fri 09:00–17:00 ET (after-hours capture story), 2–6 messages each,
-  outgoing messages carry `response_time_ms` 3000–12000 and `tokens_used`;
-  12 viewings (6 done, 2 no-shows, 1 cancelled, 3 future in 2–5 days);
-  exactly one unanswered dialog (last message incoming ~30 min old, bot live);
-  2 leads transferred to a manager (status `МЕНЕДЖЕР`).
-- Deal detail labels: `direction` → «Unit of interest», `goal` →
-  «Move-in & budget», `preferred_format` → «Bedrooms», `preferred_time` →
-  «Viewing preference», `last_objection` → «Objection»; `experience_level`
-  removed from the display.
-- The legacy funnel «Продажи Knewit» stays in the DB but is not opened during
-  the demo (see DEMO_SCRIPT.md).
-- Fresh-DB caveat: Alembic migration `0015_dialogs_list` backfills from
-  `tcs_messages` without an existence guard (unlike 0009), so on a brand-new
-  database migrations must run AFTER the bot schema exists. For the demo DB we
-  apply `tests/fixtures/tcs_schema.sql` first, then `alembic upgrade head`,
-  then the seed. To revisit before the Railway demo deploy.
+## D41. TCS demo seed and its guardrails
 
-## D42. n8n workflows are generated, not hand-edited (Phase 4)
+`scripts/seed_tcs_demo.py` fills the demo slice (never the pipeline), refuses
+without `DEMO_DB_CONFIRM`, refuses production-looking bot data and deletes only
+`source='demo'` rows. Bot field text lands in fields the CRM already shows;
+`whatsapp_id` is historical and stores `tg:<chat_id>`. Assumptions in the
+savings card are labelled as estimates.
 
-- `scripts/build_tcs_workflows.py` generates all three workflows:
-  `docs/n8n/tcs-send-message-telegram.workflow.json` (W-A),
-  `workflows/tcs_bot.json` (W-B), `workflows/tcs_reminders.json` (W-C).
-  Node parameters are cloned from the original Knewit files
-  (`crm-send-message.workflow.json` and the bot template, see TCS_BOT_TEMPLATE);
-  SQL/JS for the
-  tools comes from `docs/tcs/tools-spec.md`; the system prompt comes from
-  `docs/tcs/bot-prompt.md`. Editing generated JSON by hand is forbidden —
-  change the builder/spec and regenerate.
-- `scripts/validate_workflow.py` checks JSON validity, unique node ids/names
-  and that every connection target exists; `backend/tests/test_tcs_workflows.py`
-  runs it plus a few contract checks (Telegram instead of WhatsApp, tcs_* only,
-  prompt verbatim, 15-minute reminders).
-- W-A keeps the secret check, dedupe table and `{outbox_id, whatsapp_id, text}`
-  contract. Telegram has no `success` field, so the success output goes
-  straight to Mark Sent → Respond OK, and the error output goes to
-  Respond Error (502); dedupe is written only after a successful send.
-- W-B is a new flow, not a 1:1 port: Telegram Trigger → normalize
-  (`whatsapp_id = "tg:" + chat.id`) → non-text reply → pause check
-  (`crm_conversation_state.bot_paused`) → upsert lead → log incoming →
-  load booked slots → agent (four tools) → validate output → send reply →
-  update lead state → events → log outgoing. The reply node is the first node
-  after the agent and sits above every logging node in position.y, per the
-  brief; logging nodes use `onError = continueRegularOutput`, the send uses
-  retry 3 × 3000 ms with `continueErrorOutput`. The agent error output sends
-  the apology text and performs the handoff (МЕНЕДЖЕР + transferred_to_manager).
-- Google Sheets sync is dropped (the original branch is not recreated); the
-  Qdrant/Sheets/embeddings sub-nodes are not copied. Stage keys are the TCS
-  ones (NEW_INQUIRY … FOLLOW_UP); lead statuses keep the internal codes
-  (ЗАПИСАН/МЕНЕДЖЕР/ОТКАЗ/КЛИЕНТ/ДУМАЕТ). `book_viewing` owns the transaction
-  and writes `trial_booked` itself, so the state-machine validator does not
-  duplicate that event.
-- The prompt from the brief is embedded verbatim and followed by a
-  “Current lead state” block built from `Upsert & Load Lead State`; without it
-  the agent would re-ask known facts.
-- Version-dependent pieces (Telegram Trigger output shape, `postgresTool`
-  nodes, `toolCode` scope/`$('Load Booked Slots')`, memory table creation) are
-  marked MANUAL in `HUMAN_TODO.md` with `docs/tcs/tools-spec.md` as the
-  authoritative build guide.
+## D42. n8n workflows are generated, not hand-edited
+
+`scripts/build_tcs_workflows.py` produces the send workflow, the bot and the
+reminders; node parameters come from the original exports (bot template is
+supplied via `TCS_BOT_TEMPLATE`), SQL/JS from `docs/tcs/tools-spec.md`, the
+prompt from `docs/tcs/bot-prompt.md`. `scripts/validate_workflow.py` and the
+static tests check ids, names, connections and key contracts. New projects
+must not hand-edit generated JSON.

@@ -19,7 +19,7 @@ async def _seed_bulk(factory) -> None:
         await session.execute(
             text(
                 "INSERT INTO tcs_leads (whatsapp_id, name, current_stage, status)"
-                f" SELECT '{PREFIX}' || g || '@c.us', 'Perf', 'НОВЫЙ_ЛИД', 'ACTIVE'"
+                f" SELECT '{PREFIX}' || g || '@c.us', 'Perf', 'NEW_INQUIRY', 'ACTIVE'"
                 f" FROM generate_series(1, :n) g"
             ),
             {"n": COUNT},

@@ -65,7 +65,7 @@ placeholders. Deployment detail: `docs/tcs/RAILWAY_DEPLOY.md`.
   workflow is active. Send a test message.
 - [ ] Test booking end-to-end: the CRM must show the deal on **Viewing
   scheduled** with a viewing time and a `trial_booked` event.
-- [ ] Test the handoff: ask something out of scope → status Manager, urgent
+- [ ] Test the handoff: ask something out of scope → status HANDOFF, urgent
   task, notification.
 - [ ] Test the manager reply from the CRM: the message must reach Telegram and
   the bot must be paused.

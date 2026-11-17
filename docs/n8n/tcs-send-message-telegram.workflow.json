@@ -8,7 +8,7 @@
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "ec890df8-7d97-45ee-b448-fe83e4acfbc6",
+      "id": "505ad875-3ac4-53c8-a6fb-f24f5f605fa5",
       "name": "CRM Send Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
@@ -52,7 +52,7 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "3b8e6f71-5a1d-4811-8032-ee4c0cf0e23f",
+      "id": "d1522138-d815-565e-9d57-26d8ad44e872",
       "name": "Check Secret",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -69,7 +69,7 @@
           "responseCode": 401
         }
       },
-      "id": "b8600fc8-7089-4970-9190-2a92557b85db",
+      "id": "bf974a4e-8ca0-5803-a2b8-845afa2b565b",
       "name": "Respond 401",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -86,7 +86,7 @@
           "queryReplacement": "={{ $json.body.outbox_id }}"
         }
       },
-      "id": "990119ee-473f-405b-ba66-1dc533b30fec",
+      "id": "748e2f49-5403-5cab-8573-4533812c0ba2",
       "name": "Check Duplicate",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
@@ -94,12 +94,12 @@
         -176,
         384
       ],
-      "alwaysOutputData": true,
       "credentials": {
         "postgres": {
           "name": "Postgres account"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -126,7 +126,7 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "9d884d39-96fd-4583-a5e8-a3cab96159a6",
+      "id": "803a1a98-03d8-5556-8deb-0f030fb916c2",
       "name": "Is Duplicate",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -143,86 +143,13 @@
           "responseCode": 200
         }
       },
-      "id": "f8da6cf2-9d22-49c7-a211-0f5c44ea6d2c",
+      "id": "236d8a1b-2791-56d9-beb5-e962104d3726",
       "name": "Respond Duplicate",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
         128,
         160
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "INSERT INTO n8n_processed_outbox (outbox_id, provider_message_id) VALUES ($1::uuid, NULL) ON CONFLICT (outbox_id) DO NOTHING",
-        "options": {
-          "queryReplacement": "={{ $('CRM Send Webhook').item.json.body.outbox_id }}"
-        }
-      },
-      "id": "e85bbf63-b2b3-4185-aebb-b4176a87af2f",
-      "name": "Mark Sent",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.4,
-      "position": [
-        720,
-        336
-      ],
-      "credentials": {
-        "postgres": {
-          "name": "Postgres account"
-        }
-      },
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={\"ok\": true, \"provider_message_id\": null}",
-        "options": {
-          "responseCode": 200
-        }
-      },
-      "id": "f37b8620-1ea3-477f-b542-72782f3872a6",
-      "name": "Respond OK",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [
-        944,
-        336
-      ]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={\"ok\": false, \"error\": \"provider send failed\"}",
-        "options": {
-          "responseCode": 502
-        }
-      },
-      "id": "d1a04614-ea9d-43f6-b7eb-75e0e64af3f6",
-      "name": "Respond Error",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [
-        720,
-        512
-      ]
-    },
-    {
-      "parameters": {
-        "content": "## TCS Send Message (Telegram)\n1. Import: Workflows -> Import from file. Attach credentials in the UI: `Postgres account`, `Telegram account` (the NEW demo bot).\n2. `n8n_processed_outbox` comes from docs/n8n/README.md.\n3. Env `N8N_WEBHOOK_SECRET` in n8n = CRM `N8N_WEBHOOK_SECRET`.\n4. Telegram has no `success` field: success output -> Mark Sent -> Respond OK; error output -> Respond Error (502). Dedupe row is written only after a successful send.\n5. Activate; webhook URL https://<n8n>/webhook/crm-send-message -> CRM `N8N_SEND_WEBHOOK_URL`.",
-        "height": 320,
-        "width": 420,
-        "color": 4
-      },
-      "id": "eb8c87db-5311-4218-9b79-e51455ec7371",
-      "name": "Sticky Note",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        -1152,
-        -16
       ]
     },
     {
@@ -247,6 +174,79 @@
         }
       },
       "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO n8n_processed_outbox (outbox_id, provider_message_id) VALUES ($1::uuid, NULL) ON CONFLICT (outbox_id) DO NOTHING",
+        "options": {
+          "queryReplacement": "={{ $('CRM Send Webhook').item.json.body.outbox_id }}"
+        }
+      },
+      "id": "f8389bd0-f261-52f1-beec-61f832bd49eb",
+      "name": "Mark Sent",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        496,
+        336
+      ],
+      "credentials": {
+        "postgres": {
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"ok\": true, \"provider_message_id\": null}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "39b34ffb-2521-5a70-92ed-23387ae82d73",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"ok\": false, \"error\": \"provider send failed\"}",
+        "options": {
+          "responseCode": 502
+        }
+      },
+      "id": "0a37e67c-fc8f-546b-97c8-b2a0ca9b564c",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## TCS Send Message (Telegram)\n1. Import: Workflows -> Import from file. Attach credentials in the UI: `Postgres account`, `Telegram account` (the demo bot).\n2. `n8n_processed_outbox` comes from docs/n8n/README.md.\n3. Env `N8N_WEBHOOK_SECRET` in n8n = CRM `N8N_WEBHOOK_SECRET`.\n4. Telegram has no `success` field: success output -> Mark Sent -> Respond OK; error output -> Respond Error (502). Dedupe is written only after a successful send.\n5. Activate; webhook URL https://<n8n>/webhook/crm-send-message -> CRM `N8N_SEND_WEBHOOK_URL`.",
+        "height": 320,
+        "width": 460,
+        "color": 4
+      },
+      "id": "f6dedff1-b560-592a-80be-d5947474780c",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1152,
+        -16
+      ]
     }
   ],
   "connections": {
@@ -308,17 +308,6 @@
         ]
       ]
     },
-    "Mark Sent": {
-      "main": [
-        [
-          {
-            "node": "Respond OK",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Send Telegram Message": {
       "main": [
         [
@@ -331,6 +320,17 @@
         [
           {
             "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Sent": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
             "type": "main",
             "index": 0
           }

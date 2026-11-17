@@ -135,7 +135,7 @@ async def test_bot_stages_lists_real_values(client, settings):
     response = await client.get("/api/settings/bot-stages")
     assert response.status_code == 200, response.text
     body = response.json()
-    assert "НОВЫЙ_ЛИД" in body["stages"]
+    assert "NEW_INQUIRY" in body["stages"]
     assert "ACTIVE" in body["statuses"]
 
 

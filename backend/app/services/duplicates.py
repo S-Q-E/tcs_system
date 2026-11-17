@@ -27,7 +27,7 @@ async def find_duplicate_groups(
     limit: int = 100,
     include_deleted: bool = False,
 ) -> list[dict]:
-    """Group live contacts by normalized phone / whatsapp digits / email.
+    """Group live contacts by normalized phone / telegram digits / email.
 
     Python-side grouping keeps the query portable and test-friendly;
     contact volumes in this CRM are small (hundreds, not millions).
@@ -93,7 +93,7 @@ async def merge_contacts(
         ensure_visible(l_visible)
     if winner.whatsapp_id and loser.whatsapp_id and winner.whatsapp_id != loser.whatsapp_id:
         raise ApiError(
-            "MERGE_WHATSAPP_CONFLICT",
+            "MERGE_Telegram_CONFLICT",
             "Both contacts have different chats; merge is refused",
             409,
         )

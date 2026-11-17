@@ -10,9 +10,9 @@ BEGIN;
 INSERT INTO tcs_leads (whatsapp_id, name, current_stage, status, last_objection, created_at, updated_at, last_message_at)
 SELECT 'perf14_' || g || '@c.us',
        'Perf ' || g,
-       (ARRAY['НОВЫЙ_ЛИД','КВАЛИФИКАЦИЯ','ЗАПИСЬ','ПРОДАЖА'])[1 + (g % 4)],
-       (ARRAY['ACTIVE','ЗАПИСАН','МЕНЕДЖЕР','КЛИЕНТ','ОТКАЗ'])[1 + (g % 5)],
-       CASE WHEN g % 7 = 0 THEN 'дорого' WHEN g % 11 = 0 THEN 'нет времени' ELSE NULL END,
+       (ARRAY['NEW_INQUIRY','QUALIFIED','VIEWING_SCHEDULED','VIEWING_DONE'])[1 + (g % 4)],
+       (ARRAY['ACTIVE','VIEWING_BOOKED','HANDOFF','LEASED','LOST'])[1 + (g % 5)],
+       CASE WHEN g % 7 = 0 THEN 'price' WHEN g % 11 = 0 THEN 'no time' ELSE NULL END,
        now() - ((g * 37) % 129600 || ' minutes')::interval,
        now() - ((g * 13) % 10000 || ' minutes')::interval,
        now() - ((g * 29) % 50000 || ' minutes')::interval
@@ -24,7 +24,7 @@ SELECT 'perf14_' || (1 + (g % 2000)) || '@c.us',
        CASE WHEN g % 2 = 0 THEN 'in' ELSE 'out' END,
        'chat',
        'perf message ' || g,
-       'НОВЫЙ_ЛИД',
+       'NEW_INQUIRY',
        10 + (g % 200),
        CASE WHEN g % 2 = 1 THEN 500 + (g % 3000) ELSE NULL END,
        now() - (g || ' minutes')::interval
@@ -33,7 +33,7 @@ FROM generate_series(1, 100000) g;
 INSERT INTO tcs_events (whatsapp_id, event_type, from_stage, to_stage, created_at)
 SELECT 'perf14_' || (1 + (g % 2000)) || '@c.us',
        (ARRAY['stage_entered','objection_raised','trial_booked','transferred_to_manager'])[1 + (g % 4)],
-       'НОВЫЙ_ЛИД', 'КВАЛИФИКАЦИЯ',
+       'NEW_INQUIRY', 'QUALIFIED',
        now() - ((g * 3) || ' minutes')::interval
 FROM generate_series(1, 10000) g;
 

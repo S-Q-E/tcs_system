@@ -177,7 +177,7 @@ async def test_move_locks_and_calls_bridge(client, settings):
         wa = _wa()
         contact = await create_contact(client, token, whatsapp_id=wa)
         contact_ids.append(contact["id"])
-        await _lead_row(factory, wa, stages[0]["bot_stage_key"] or "НОВЫЙ_ЛИД")
+        await _lead_row(factory, wa, stages[0]["bot_stage_key"] or "NEW_INQUIRY")
         deal = await create_deal(client, token, contact["id"], pipeline, stage_id=src)
 
         # Same-stage reorder: no lock, no history.

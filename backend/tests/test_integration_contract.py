@@ -21,7 +21,7 @@ pytestmark = pytest.mark.usefixtures("db_available")
 APP_DIR = Path(__file__).resolve().parents[1] / "app"
 
 # Columns CRM reads or writes (queries in services/, routers/, workers/).
-KNEWIT_CONTRACT: dict[str, set[str]] = {
+BOT_TABLES_CONTRACT: dict[str, set[str]] = {
     "tcs_leads": {
         "id",
         "whatsapp_id",
@@ -92,7 +92,7 @@ async def _fetch(settings, sql: str, params: dict | None = None) -> list:
 def test_code_uses_only_contracted_tables():
     used = _code_tcs_tables()
     assert used, "no tcs_* references found: the scan is broken"
-    unknown = used - set(KNEWIT_CONTRACT)
+    unknown = used - set(BOT_TABLES_CONTRACT)
     assert not unknown, f"CRM code references tcs_* tables outside the contract: {unknown}"
 
 
@@ -110,7 +110,7 @@ async def test_contracted_columns_exist_in_test_schema(settings):
 
     missing = {
         table: sorted(columns - actual.get(table, set()))
-        for table, columns in KNEWIT_CONTRACT.items()
+        for table, columns in BOT_TABLES_CONTRACT.items()
         if columns - actual.get(table, set())
     }
     assert not missing, f"tcs_* columns CRM depends on are missing: {missing}"

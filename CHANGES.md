@@ -28,7 +28,8 @@ merged or pushed to `main`; the original workspace was not modified.
 
 - Bot tables use the `tcs_*` names everywhere (`backend/app/**`,
   `backend/tests/**`, `scripts/**`, `tests/fixtures/tcs_schema.sql`,
-  `docs/**`); `tests/fixtures/knewit_schema.sql` renamed.
+  `docs/**`); the bot schema fixture was renamed to
+  `tests/fixtures/tcs_schema.sql`.
 - `backend/alembic/versions/0022_sync_contact_fields.py`: bot fields mirrored
   into `crm_contacts.last_bot_*` (migration, crm_* only).
 - `RECON.md` — Phase 0 research notes.
@@ -68,7 +69,7 @@ merged or pushed to `main`; the original workspace was not modified.
 ## Phase 4 — n8n workflows
 
 - `scripts/build_tcs_workflows.py` — generates all three workflows from the
-  original Knewit templates, `docs/tcs/tools-spec.md` and
+  original workflow templates, `docs/tcs/tools-spec.md` and
   `docs/tcs/bot-prompt.md`; `scripts/validate_workflow.py` — structural
   validation (JSON, ids, names, connections).
 - Generated:

@@ -917,7 +917,8 @@ Why: protects against accidental data loss, keeps audit trail.
   `docs/n8n/tcs-send-message-telegram.workflow.json` (W-A),
   `workflows/tcs_bot.json` (W-B), `workflows/tcs_reminders.json` (W-C).
   Node parameters are cloned from the original Knewit files
-  (`crm-send-message.workflow.json`, `knewit-whatsapp-v2.json`); SQL/JS for the
+  (`crm-send-message.workflow.json` and the bot template, see TCS_BOT_TEMPLATE);
+  SQL/JS for the
   tools comes from `docs/tcs/tools-spec.md`; the system prompt comes from
   `docs/tcs/bot-prompt.md`. Editing generated JSON by hand is forbidden —
   change the builder/spec and regenerate.

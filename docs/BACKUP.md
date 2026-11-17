@@ -7,13 +7,13 @@ full-database; there is no per-table point-in-time story by design.
 ## Schedule
 
 `scripts/backup.sh` dumps custom-format (`-Fc`, compressed) to `$BACKUP_DIR`
-(default `/var/backups/knewitcrm`) and rotates: newest `KEEP_DAILY` (default 7)
+(default `/var/backups/tcs-leasing-crm`) and rotates: newest `KEEP_DAILY` (default 7)
 dumps plus the newest dump of each ISO week (`KEEP_WEEKLY`, default 4).
 
 Run nightly via cron on the backup host (or a Railway cron service):
 
 ```cron
-0 3 * * * BACKUP_DIR=/var/backups/knewitcrm KEEP_DAILY=7 KEEP_WEEKLY=4 \
+0 3 * * * BACKUP_DIR=/var/backups/tcs-leasing-crm KEEP_DAILY=7 KEEP_WEEKLY=4 \
   DATABASE_URL="$DATABASE_URL" /app/scripts/backup.sh >> /var/log/tcs-backup.log 2>&1
 ```
 
@@ -34,7 +34,7 @@ dropdb "$PGDATABASE" && createdb "$PGDATABASE"
 
 # 3. Restore in one transaction.
 pg_restore --dbname="$DATABASE_URL" --no-owner --single-transaction \
-  knewitcrm-<STAMP>.dump
+  tcs-leasing-crm-<STAMP>.dump
 
 # 4. Verify: alembic version table + row counts.
 psql "$DATABASE_URL" -c "SELECT version_num FROM crm_alembic_version;"

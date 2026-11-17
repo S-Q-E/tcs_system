@@ -4,7 +4,7 @@
 # PGPASSWORD/PGDATABASE). Never commit dumps or credentials.
 set -euo pipefail
 
-BACKUP_DIR="${BACKUP_DIR:-/var/backups/knewitcrm}"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/tcs-leasing-crm}"
 KEEP_DAILY="${KEEP_DAILY:-7}"
 KEEP_WEEKLY="${KEEP_WEEKLY:-4}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -17,7 +17,7 @@ else
   PGURL="postgresql://${PGUSER:-tcs}:${PGPASSWORD:-}@${PGHOST:-localhost}:${PGPORT:-5432}/${PGDATABASE:-tcs}"
 fi
 
-DUMP="$BACKUP_DIR/knewitcrm-$STAMP.dump"
+DUMP="$BACKUP_DIR/tcs-leasing-crm-$STAMP.dump"
 # Custom format: compressed, parallel-restorable, single transaction on restore.
 pg_dump --format=custom --compress=9 --no-owner --file="$DUMP" "$PGURL"
 echo "wrote $DUMP ($(du -h "$DUMP" | cut -f1))"
@@ -25,7 +25,7 @@ echo "wrote $DUMP ($(du -h "$DUMP" | cut -f1))"
 # Rotation, newest first: keep KEEP_DAILY dumps, then the newest dump of each
 # ISO week (up to KEEP_WEEKLY extra weeks), delete the rest.
 cd "$BACKUP_DIR"
-mapfile -t all < <(ls -1t knewitcrm-*.dump 2>/dev/null || true)
+mapfile -t all < <(ls -1t tcs-leasing-crm-*.dump 2>/dev/null || true)
 declare -A keep=()
 declare -A week_kept=()
 weekly_extras=0
@@ -35,7 +35,7 @@ for ((i = 0; i < ${#all[@]}; i++)); do
     keep["$f"]=1
     continue
   fi
-  day="${f#knewitcrm-}"
+  day="${f#tcs-leasing-crm-}"
   day="${day:0:8}"
   week="$(date -u -d "${day:0:4}-${day:4:2}-${day:6:2}" +%G-W%V 2>/dev/null || echo "day-$day")"
   if [[ -z "${week_kept[$week]:-}" && $weekly_extras -lt $KEEP_WEEKLY ]]; then
@@ -50,4 +50,4 @@ for f in "${all[@]}"; do
   fi
 done
 
-echo "ok: $(ls -1 knewitcrm-*.dump 2>/dev/null | wc -l) dumps retained"
+echo "ok: $(ls -1 tcs-leasing-crm-*.dump 2>/dev/null | wc -l) dumps retained"

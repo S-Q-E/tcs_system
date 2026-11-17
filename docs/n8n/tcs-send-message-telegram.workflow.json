@@ -211,7 +211,7 @@
     },
     {
       "parameters": {
-        "content": "## TCS Send Message (Telegram)\n1. Import: Workflows -> Import from file. Attach credentials in the UI: `Postgres account`, `Telegram account` (the NEW demo bot, not the Knewit bot).\n2. `n8n_processed_outbox` comes from docs/n8n/README.md.\n3. Env `N8N_WEBHOOK_SECRET` in n8n = CRM `N8N_WEBHOOK_SECRET`.\n4. Telegram has no `success` field: success output -> Mark Sent -> Respond OK; error output -> Respond Error (502). Dedupe row is written only after a successful send.\n5. Activate; webhook URL https://<n8n>/webhook/crm-send-message -> CRM `N8N_SEND_WEBHOOK_URL`.",
+        "content": "## TCS Send Message (Telegram)\n1. Import: Workflows -> Import from file. Attach credentials in the UI: `Postgres account`, `Telegram account` (the NEW demo bot).\n2. `n8n_processed_outbox` comes from docs/n8n/README.md.\n3. Env `N8N_WEBHOOK_SECRET` in n8n = CRM `N8N_WEBHOOK_SECRET`.\n4. Telegram has no `success` field: success output -> Mark Sent -> Respond OK; error output -> Respond Error (502). Dedupe row is written only after a successful send.\n5. Activate; webhook URL https://<n8n>/webhook/crm-send-message -> CRM `N8N_SEND_WEBHOOK_URL`.",
         "height": 320,
         "width": 420,
         "color": 4

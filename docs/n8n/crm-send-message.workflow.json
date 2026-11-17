@@ -146,7 +146,7 @@
       "position": [272, 368],
       "credentials": {
         "chatflowApi": {
-          "name": "knewit whatsapp"
+          "name": "Chatflow account"
         }
       },
       "onError": "continueErrorOutput"
@@ -232,7 +232,7 @@
     },
     {
       "parameters": {
-        "content": "## CRM Send Message (исправленная версия)\n1. Импорт: Workflows → Import from file. Credentials подключить в UI: `Postgres account`, `knewit whatsapp`.\n2. Таблица `n8n_processed_outbox` создаётся по SQL из docs/n8n/README.md §Дедупликация.\n3. Env `N8N_WEBHOOK_SECRET` в n8n = CRM `N8N_WEBHOOK_SECRET`.\n4. Успех = `success: true` у Chatflow. Любой другой ответ → 502, в дедуп-таблицу не пишем, повтор из CRM снова отправит.\n5. Активировать, URL `https://<n8n>/webhook/crm-send-message` → CRM `N8N_SEND_WEBHOOK_URL`.",
+        "content": "## CRM Send Message (исправленная версия)\n1. Импорт: Workflows → Import from file. Credentials подключить в UI: `Postgres account`, `Chatflow account`.\n2. Таблица `n8n_processed_outbox` создаётся по SQL из docs/n8n/README.md §Дедупликация.\n3. Env `N8N_WEBHOOK_SECRET` в n8n = CRM `N8N_WEBHOOK_SECRET`.\n4. Успех = `success: true` у Chatflow. Любой другой ответ → 502, в дедуп-таблицу не пишем, повтор из CRM снова отправит.\n5. Активировать, URL `https://<n8n>/webhook/crm-send-message` → CRM `N8N_SEND_WEBHOOK_URL`.",
         "height": 320,
         "width": 420,
         "color": 4

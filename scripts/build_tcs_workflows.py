@@ -1,6 +1,6 @@
 """Build the TCS demo n8n workflows.
 
-Templates are the original Knewit workflows in docs/n8n/; node parameters are
+Templates are the original workflow exports in docs/n8n/; node parameters are
 cloned from them. Tool SQL/JS comes from docs/tcs/tools-spec.md, the system
 prompt from docs/tcs/bot-prompt.md.
 
@@ -15,6 +15,7 @@ Run: .venv/bin/python scripts/build_tcs_workflows.py
 from __future__ import annotations
 
 import json
+import os
 import re
 import uuid
 from pathlib import Path
@@ -26,7 +27,9 @@ TCS_DOCS = ROOT / "docs" / "tcs"
 WORKFLOWS = ROOT / "workflows"
 
 SEND_WA = N8N_DIR / "crm-send-message.workflow.json"
-BOT_ORIGINAL = N8N_DIR / "knewit-whatsapp-v2.json"
+BOT_ORIGINAL = Path(
+    os.environ.get("TCS_BOT_TEMPLATE", N8N_DIR / "reference-whatsapp-v2.workflow.json")
+)
 TOOLS_SPEC = TCS_DOCS / "tools-spec.md"
 BOT_PROMPT = TCS_DOCS / "bot-prompt.md"
 
@@ -138,7 +141,7 @@ def build_send_message() -> dict:
             n["parameters"]["content"] = (
                 "## TCS Send Message (Telegram)\n"
                 "1. Import: Workflows -> Import from file. Attach credentials in the UI: "
-                "`Postgres account`, `Telegram account` (the NEW demo bot, not the Knewit bot).\n"
+                "`Postgres account`, `Telegram account` (the NEW demo bot).\n"
                 "2. `n8n_processed_outbox` comes from docs/n8n/README.md.\n"
                 "3. Env `N8N_WEBHOOK_SECRET` in n8n = CRM `N8N_WEBHOOK_SECRET`.\n"
                 "4. Telegram has no `success` field: success output -> Mark Sent -> Respond OK; "
@@ -182,7 +185,7 @@ def build_send_message() -> dict:
 # ---------------------------------------------------------------------- W-B
 
 
-def _knewit_nodes() -> dict[str, dict]:
+def _template_nodes() -> dict[str, dict]:
     data = json.loads(BOT_ORIGINAL.read_text(encoding="utf-8"))
     return {n["name"]: n for n in data["nodes"]}
 
@@ -293,7 +296,12 @@ return [{
 
 
 def build_bot() -> dict:
-    known = _knewit_nodes()
+    if not BOT_ORIGINAL.exists():
+        raise SystemExit(
+            f"Bot template not found: {BOT_ORIGINAL}. "
+            "Set TCS_BOT_TEMPLATE=<path to the original workflow export>."
+        )
+    known = _template_nodes()
     prompt = BOT_PROMPT.read_text(encoding="utf-8").rstrip()
     state_block = """
 

@@ -277,7 +277,7 @@
 - [x] P2-2 realtime cursor: overlap + dedupe (fixes lost out-of-order commits), cursor restored
   after restart within a 500-id gap (D29)
 - [x] P3-6 realtime status indicator in the header (D29)
-- [ ] Open items and blockers: see `docs/KNEWIT_INTEGRATION_ROADMAP.md` §1
+- [ ] Open items and blockers: see `docs/tcs/IMPROVEMENT_PLAN.md`
 - Test database reproduction: `DROP/CREATE tcs_test`, then `tcs_schema.sql`, `seed.sql`,
   `alembic upgrade head`, `pytest -q -p no:cacheprovider` (password only via environment).
   Known timing flakes under machine load: `test_login_timing_equalized`,

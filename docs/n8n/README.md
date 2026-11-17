@@ -15,7 +15,7 @@ Webhook POST /webhook/crm-send-message
   {outbox_id, whatsapp_id, text} + header X-CRM-Secret
     → 401 {ok:false} при несовпадении секрета
     → дедупликация по outbox_id (повтор = 200 без второй отправки)
-    → отправка нодой Chatflow «Send WhatsApp Message» (credential `knewit whatsapp`)
+    → отправка нодой Chatflow «Send WhatsApp Message» (credential `Chatflow account`)
     → success:true → запись в n8n_processed_outbox → 200 {ok:true, provider_message_id:null}
     → любой другой ответ (success:false, ошибка ноды) → 502 {ok:false}, без записи в дедуп
 ```
@@ -42,7 +42,7 @@ Webhook POST /webhook/crm-send-message
 1. n8n → Workflows → `⋯` → Import from file → выбрать
    `crm-send-message.workflow.json`.
 2. Credentials в нодах `Check Duplicate`, `Mark Sent` (`Postgres account`) и
-   `Send WhatsApp Message` (`knewit whatsapp`, Chatflow) выбрать в UI после импорта:
+   `Send WhatsApp Message` (`Chatflow account`, Chatflow) выбрать в UI после импорта:
    в файле они не хранятся. Получатель и текст уже заданы из `body` запроса
    (`whatsapp_id`, `text`).
 3. В окружении n8n задать `N8N_WEBHOOK_SECRET` — тот же, что

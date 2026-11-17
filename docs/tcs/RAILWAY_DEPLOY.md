@@ -12,7 +12,7 @@ All data is fictional. Never point this project at a production database.
 ## 0. Prerequisites
 
 - GitHub fork with branch `demo` (contains `Dockerfile`, `railway.json`).
-- A NEW Telegram bot from BotFather (never the Knewit bot token).
+- A NEW Telegram bot from BotFather (never reuse a token from another project).
 - Local tools for the one-time database preparation: `psql`, Python + venv
   with `requirements-dev.txt` installed (the repo's `.venv` works).
 - Railway account with permission to create projects.
@@ -166,8 +166,7 @@ Wait 15 seconds (sync worker), then follow `DEMO_SCRIPT.md` → «Before the dem
   downgrades are not needed: the demo DB can be recreated and re-seeded.
 - **Costs:** one Postgres + one small web service; stop the service after the
   demo if it is not needed.
-- **Do not merge `demo` into `main`** and do not deploy this workflow from the
-  original Knewit project.
+- **Do not merge `demo` into `main`** do not deploy this branch anywhere else.
 - **Security:** rotate the demo bot token, the n8n secret and the admin
   password after the demo; disable the Postgres TCP proxy when not seeding.
 

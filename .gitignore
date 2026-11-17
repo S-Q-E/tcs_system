@@ -15,8 +15,3 @@ frontend/openapi.json
 frontend/tsconfig.tsbuildinfo
 frontend/test-results/
 frontend/playwright-report/
-
-# Local KnewIT artifacts — not part of the TCS demo
-knewitcrm/
-*Knewit*.json
-*knewit*.json

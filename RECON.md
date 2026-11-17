@@ -1,7 +1,7 @@
 # RECON — TCS Property Management demo
 
 Фаза 0. Код не менялся. Репозиторий: `/home/quanysh/tcs_automation/tcs_demo`,
-ветка `tcs-demo` (от `main`, коммит `c7326ad`). Оригинал `knewitcrm/` не тронут.
+ветка `demo` (отдельная копия проекта, база — коммит `c7326ad`).
 
 ## 0. Базовая линия
 

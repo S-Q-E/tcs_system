@@ -173,7 +173,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # production (smaller attack surface, no internal shape leakage).
     docs_enabled = settings.app_env != "production"
     app = FastAPI(
-        title="KnewIT CRM",
+        title="TCS Leasing CRM",
         version="1.0.0",
         lifespan=lifespan,
         docs_url="/docs" if docs_enabled else None,

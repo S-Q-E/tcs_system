@@ -13,14 +13,14 @@ placeholders. Deployment detail: `docs/tcs/RAILWAY_DEPLOY.md`.
 
 ## 1. Telegram bot
 
-- [ ] Create a **new** bot in BotFather — never reuse the Knewit bot token.
+- [ ] Create a **new** bot in BotFather — never reuse a token from another project.
 - [ ] Put the token only into the n8n credential `Telegram account`.
 - [ ] Rotate the token after the demo.
 
 ## 2. Railway (see `docs/tcs/RAILWAY_DEPLOY.md`)
 
 - [ ] Create a separate project `tcs-demo` with Postgres + web service from the
-  fork, branch `demo`. Never deploy into the original Knewit project.
+  fork, branch `demo`. Deploy only to this dedicated demo project.
 - [ ] **Prepare the DB before the first boot** (schema → migrations → seed):
   Alembic 0015 backfills from `tcs_messages`, so a brand-new database needs
   `tests/fixtures/tcs_schema.sql` first. Commands are in the deploy guide §2.

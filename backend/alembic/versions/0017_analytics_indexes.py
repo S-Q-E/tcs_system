@@ -14,18 +14,18 @@ branch_labels = None
 depends_on = None
 
 INDEXES = (
-    ("ix_crm_deals_created_at", "crm_deals (created_at)"),
-    ("ix_crm_deals_closed_at", "crm_deals (closed_at)"),
-    ("ix_crm_deals_trial_at", "crm_deals (trial_at)"),
-    ("ix_crm_deals_status", "crm_deals (status)"),
-    ("ix_crm_deals_pipeline_created", "crm_deals (pipeline_id, created_at)"),
-    ("ix_crm_deal_stage_history_deal_at", "crm_deal_stage_history (deal_id, at)"),
-    ("ix_crm_deal_stage_history_to_stage", "crm_deal_stage_history (to_stage_id)"),
-    ("ix_crm_contacts_created_at", "crm_contacts (created_at)"),
-    ("ix_crm_contacts_source", "crm_contacts (source)"),
-    ("ix_crm_tasks_done_at", "crm_tasks (done_at)"),
-    ("ix_crm_tasks_due_at", "crm_tasks (due_at)"),
-    ("ix_crm_entity_tags_entity_target", "crm_entity_tags (entity, entity_id)"),
+    ("ix_tcs_crm_deals_created_at", "tcs_crm_deals (created_at)"),
+    ("ix_tcs_crm_deals_closed_at", "tcs_crm_deals (closed_at)"),
+    ("ix_tcs_crm_deals_trial_at", "tcs_crm_deals (trial_at)"),
+    ("ix_tcs_crm_deals_status", "tcs_crm_deals (status)"),
+    ("ix_tcs_crm_deals_pipeline_created", "tcs_crm_deals (pipeline_id, created_at)"),
+    ("ix_tcs_crm_deal_stage_history_deal_at", "tcs_crm_deal_stage_history (deal_id, at)"),
+    ("ix_tcs_crm_deal_stage_history_to_stage", "tcs_crm_deal_stage_history (to_stage_id)"),
+    ("ix_tcs_crm_contacts_created_at", "tcs_crm_contacts (created_at)"),
+    ("ix_tcs_crm_contacts_source", "tcs_crm_contacts (source)"),
+    ("ix_tcs_crm_tasks_done_at", "tcs_crm_tasks (done_at)"),
+    ("ix_tcs_crm_tasks_due_at", "tcs_crm_tasks (due_at)"),
+    ("ix_tcs_crm_entity_tags_entity_target", "tcs_crm_entity_tags (entity, entity_id)"),
 )
 
 

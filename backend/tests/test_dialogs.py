@@ -46,16 +46,18 @@ async def _purge_lead(factory, wa: str) -> None:
         contacts = (
             (
                 await session.execute(
-                    text("SELECT id FROM crm_contacts WHERE whatsapp_id = :wa"), {"wa": wa}
+                    text("SELECT id FROM tcs_crm_contacts WHERE whatsapp_id = :wa"), {"wa": wa}
                 )
             )
             .scalars()
             .all()
         )
         await session.execute(
-            text("DELETE FROM crm_conversation_state WHERE whatsapp_id = :wa"), {"wa": wa}
+            text("DELETE FROM tcs_crm_conversation_state WHERE whatsapp_id = :wa"), {"wa": wa}
         )
-        await session.execute(text("DELETE FROM crm_outbox WHERE whatsapp_id = :wa"), {"wa": wa})
+        await session.execute(
+            text("DELETE FROM tcs_crm_outbox WHERE whatsapp_id = :wa"), {"wa": wa}
+        )
         await session.execute(text("DELETE FROM tcs_messages WHERE whatsapp_id = :wa"), {"wa": wa})
         await session.execute(text("DELETE FROM tcs_events WHERE whatsapp_id = :wa"), {"wa": wa})
         await session.execute(text("DELETE FROM tcs_leads WHERE whatsapp_id = :wa"), {"wa": wa})
@@ -235,7 +237,7 @@ async def test_read_and_patch_refuse_a_dialog_without_a_bot_lead(client, setting
         async with factory() as session:
             await session.execute(
                 text(
-                    "INSERT INTO crm_conversation_state (whatsapp_id, bot_paused)"
+                    "INSERT INTO tcs_crm_conversation_state (whatsapp_id, bot_paused)"
                     " VALUES (:wa, FALSE)"
                 ),
                 {"wa": wa},
@@ -253,7 +255,9 @@ async def test_read_and_patch_refuse_a_dialog_without_a_bot_lead(client, setting
         async with factory() as session:
             paused = (
                 await session.execute(
-                    text("SELECT bot_paused FROM crm_conversation_state WHERE whatsapp_id = :wa"),
+                    text(
+                        "SELECT bot_paused FROM tcs_crm_conversation_state WHERE whatsapp_id = :wa"
+                    ),
                     {"wa": wa},
                 )
             ).scalar_one()
@@ -261,7 +265,7 @@ async def test_read_and_patch_refuse_a_dialog_without_a_bot_lead(client, setting
     finally:
         async with factory() as session:
             await session.execute(
-                text("DELETE FROM crm_conversation_state WHERE whatsapp_id = :wa"), {"wa": wa}
+                text("DELETE FROM tcs_crm_conversation_state WHERE whatsapp_id = :wa"), {"wa": wa}
             )
             await session.commit()
         await engine.dispose()

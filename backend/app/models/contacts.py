@@ -15,7 +15,7 @@ CONTACT_SOURCE_BOT = "bot"
 class CrmContact(Base):
     """CRM contact. Bot leads link via whatsapp_id (D2)."""
 
-    __tablename__ = "crm_contacts"
+    __tablename__ = "tcs_crm_contacts"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     whatsapp_id: Mapped[str | None] = mapped_column(Text, nullable=True, unique=True, index=True)
@@ -27,7 +27,7 @@ class CrmContact(Base):
     )
     owner_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("crm_users.id", ondelete="SET NULL"),
+        ForeignKey("tcs_crm_users.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
@@ -56,17 +56,17 @@ class CrmContact(Base):
 class CrmConversationState(Base):
     """Per-chat CRM state (pause, assignment, unread). One row per whatsapp_id."""
 
-    __tablename__ = "crm_conversation_state"
+    __tablename__ = "tcs_crm_conversation_state"
 
     whatsapp_id: Mapped[str] = mapped_column(Text, primary_key=True)
     bot_paused: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=func.false())
     paused_by: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("crm_users.id", ondelete="SET NULL"), nullable=True
+        UUID(as_uuid=True), ForeignKey("tcs_crm_users.id", ondelete="SET NULL"), nullable=True
     )
     paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     assigned_to: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("crm_users.id", ondelete="SET NULL"),
+        ForeignKey("tcs_crm_users.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )

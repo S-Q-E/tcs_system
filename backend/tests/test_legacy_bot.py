@@ -58,32 +58,34 @@ async def test_migrate_creates_only_version_table(settings):
                 .scalars()
                 .all()
             )
-            assert "crm_alembic_version" in tables
-            crm_tables = [t for t in tables if t.startswith("crm_") and t != "crm_alembic_version"]
+            assert "tcs_crm_alembic_version" in tables
+            crm_tables = [
+                t for t in tables if t.startswith("tcs_crm_") and t != "tcs_crm_alembic_version"
+            ]
             assert set(crm_tables) == {
-                "crm_users",
-                "crm_sessions",
-                "crm_login_attempts",
-                "crm_pipelines",
-                "crm_stages",
-                "crm_contacts",
-                "crm_deals",
-                "crm_deal_stage_history",
-                "crm_notes",
-                "crm_saved_views",
-                "crm_tasks",
-                "crm_notifications",
-                "crm_automations",
-                "crm_lost_reasons",
-                "crm_tags",
-                "crm_entity_tags",
-                "crm_custom_fields",
-                "crm_conversation_state",
-                "crm_settings",
-                "crm_activity_log",
-                "crm_outbox",
-                "crm_quick_replies",
-                "crm_imports",
+                "tcs_crm_users",
+                "tcs_crm_sessions",
+                "tcs_crm_login_attempts",
+                "tcs_crm_pipelines",
+                "tcs_crm_stages",
+                "tcs_crm_contacts",
+                "tcs_crm_deals",
+                "tcs_crm_deal_stage_history",
+                "tcs_crm_notes",
+                "tcs_crm_saved_views",
+                "tcs_crm_tasks",
+                "tcs_crm_notifications",
+                "tcs_crm_automations",
+                "tcs_crm_lost_reasons",
+                "tcs_crm_tags",
+                "tcs_crm_entity_tags",
+                "tcs_crm_custom_fields",
+                "tcs_crm_conversation_state",
+                "tcs_crm_settings",
+                "tcs_crm_activity_log",
+                "tcs_crm_outbox",
+                "tcs_crm_quick_replies",
+                "tcs_crm_imports",
             }
             # Bot data untouched.
             count = await conn.execute(text("SELECT COUNT(*) FROM tcs_leads"))

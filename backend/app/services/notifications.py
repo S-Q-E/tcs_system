@@ -41,7 +41,7 @@ async def notify(
         inserted = (
             await session.execute(
                 text(
-                    "INSERT INTO crm_notifications (id, user_id, type, payload, dedupe_key)"
+                    "INSERT INTO tcs_crm_notifications (id, user_id, type, payload, dedupe_key)"
                     " VALUES (gen_random_uuid(), :user_id, :type,"
                     " CAST(:payload AS jsonb), :key)"
                     " ON CONFLICT DO NOTHING RETURNING id"
@@ -77,7 +77,7 @@ async def already_notified(
     row = (
         await session.execute(
             text(
-                "SELECT 1 FROM crm_notifications"
+                "SELECT 1 FROM tcs_crm_notifications"
                 " WHERE user_id = :user_id AND type = :type AND dedupe_key = :key LIMIT 1"
             ),
             {"user_id": user_id, "type": type, "key": dedupe_key},

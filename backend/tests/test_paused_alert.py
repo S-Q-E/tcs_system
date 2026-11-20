@@ -18,7 +18,7 @@ async def _state(factory, wa: str, *, paused: bool, at) -> None:
     async with factory() as session:
         await session.execute(
             text(
-                "INSERT INTO crm_conversation_state (whatsapp_id, bot_paused, paused_at)"
+                "INSERT INTO tcs_crm_conversation_state (whatsapp_id, bot_paused, paused_at)"
                 " VALUES (:wa, :paused, :at)"
             ),
             {"wa": wa, "paused": paused, "at": at},
@@ -29,11 +29,11 @@ async def _state(factory, wa: str, *, paused: bool, at) -> None:
 async def _cleanup(factory) -> None:
     async with factory() as session:
         await session.execute(
-            text("DELETE FROM crm_notifications WHERE dedupe_key LIKE :p"),
+            text("DELETE FROM tcs_crm_notifications WHERE dedupe_key LIKE :p"),
             {"p": f"paused:{PREFIX}%"},
         )
         await session.execute(
-            text("DELETE FROM crm_conversation_state WHERE whatsapp_id LIKE :p"),
+            text("DELETE FROM tcs_crm_conversation_state WHERE whatsapp_id LIKE :p"),
             {"p": PREFIX + "%"},
         )
         await session.commit()
@@ -44,7 +44,7 @@ async def _count(factory, user_id: str, wa: str) -> int:
         return (
             await session.execute(
                 text(
-                    "SELECT COUNT(*) FROM crm_notifications"
+                    "SELECT COUNT(*) FROM tcs_crm_notifications"
                     " WHERE type = 'bot_paused_long' AND user_id = :u AND dedupe_key LIKE :k"
                 ),
                 {"u": user_id, "k": f"paused:{wa}:%"},
@@ -88,7 +88,7 @@ async def test_long_pause_notifies_all_active_users_once_per_episode(client, set
             admin_id = str(
                 (
                     await session.execute(
-                        text("SELECT id FROM crm_users WHERE email = :e"),
+                        text("SELECT id FROM tcs_crm_users WHERE email = :e"),
                         {"e": settings.admin_email.lower()},
                     )
                 ).scalar_one()
@@ -108,7 +108,7 @@ async def test_long_pause_notifies_all_active_users_once_per_episode(client, set
 
         async with factory() as session:
             await session.execute(
-                text("UPDATE crm_notifications SET read_at = now() WHERE dedupe_key LIKE :k"),
+                text("UPDATE tcs_crm_notifications SET read_at = now() WHERE dedupe_key LIKE :k"),
                 {"k": f"paused:{long_wa}:%"},
             )
             await session.commit()
@@ -117,7 +117,9 @@ async def test_long_pause_notifies_all_active_users_once_per_episode(client, set
 
         async with factory() as session:
             await session.execute(
-                text("UPDATE crm_conversation_state SET paused_at = :at WHERE whatsapp_id = :wa"),
+                text(
+                    "UPDATE tcs_crm_conversation_state SET paused_at = :at WHERE whatsapp_id = :wa"
+                ),
                 {"at": now - timedelta(hours=8), "wa": long_wa},
             )
             await session.commit()

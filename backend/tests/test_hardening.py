@@ -55,7 +55,7 @@ async def _audit_count(factory, action: str) -> int:
     async with factory() as session:
         return (
             await session.execute(
-                text("SELECT COUNT(*) FROM crm_activity_log WHERE action = :action"),
+                text("SELECT COUNT(*) FROM tcs_crm_activity_log WHERE action = :action"),
                 {"action": action},
             )
         ).scalar() or 0
@@ -246,7 +246,7 @@ async def test_audit_login_user_export(client, settings):
             row = (
                 await session.execute(
                     text(
-                        "SELECT diff FROM crm_activity_log WHERE action = 'user_updated'"
+                        "SELECT diff FROM tcs_crm_activity_log WHERE action = 'user_updated'"
                         " ORDER BY created_at DESC LIMIT 1"
                     )
                 )
@@ -329,7 +329,7 @@ async def test_malicious_message_content_round_trips_as_text(client, settings):
     finally:
         async with factory() as session:
             await session.execute(
-                text("DELETE FROM crm_outbox WHERE whatsapp_id = :wa"), {"wa": wa}
+                text("DELETE FROM tcs_crm_outbox WHERE whatsapp_id = :wa"), {"wa": wa}
             )
             await session.execute(
                 text("DELETE FROM tcs_messages WHERE whatsapp_id = :wa"), {"wa": wa}
@@ -344,7 +344,7 @@ async def test_malicious_message_content_round_trips_as_text(client, settings):
 
 async def test_poller_rejects_unexpected_tables(tx_session):
     with pytest.raises(ValueError, match="unexpected table"):
-        await _max_id(tx_session, "crm_users")
+        await _max_id(tx_session, "tcs_crm_users")
 
 
 async def test_pool_defaults(settings):

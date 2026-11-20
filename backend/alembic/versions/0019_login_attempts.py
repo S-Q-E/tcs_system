@@ -17,7 +17,7 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute(
-        "CREATE TABLE IF NOT EXISTS crm_login_attempts ("
+        "CREATE TABLE IF NOT EXISTS tcs_crm_login_attempts ("
         " id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,"
         " ip VARCHAR(64) NOT NULL,"
         " email VARCHAR(255) NOT NULL,"
@@ -25,14 +25,14 @@ def upgrade() -> None:
         ")"
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_crm_login_attempts_email_at"
-        " ON crm_login_attempts (email, at DESC)"
+        "CREATE INDEX IF NOT EXISTS ix_tcs_crm_login_attempts_email_at"
+        " ON tcs_crm_login_attempts (email, at DESC)"
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_crm_login_attempts_ip_email_at"
-        " ON crm_login_attempts (ip, email, at DESC)"
+        "CREATE INDEX IF NOT EXISTS ix_tcs_crm_login_attempts_ip_email_at"
+        " ON tcs_crm_login_attempts (ip, email, at DESC)"
     )
 
 
 def downgrade() -> None:
-    op.execute("DROP TABLE IF EXISTS crm_login_attempts")
+    op.execute("DROP TABLE IF EXISTS tcs_crm_login_attempts")

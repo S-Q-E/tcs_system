@@ -4,7 +4,7 @@
 -- Production has NO foreign keys between tcs_* tables: rows are matched by
 -- whatsapp_id, so tests must delete child rows explicitly.
 
-CREATE OR REPLACE FUNCTION public.update_updated_at_column() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.tcs_set_updated_at() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -112,4 +112,4 @@ CREATE INDEX IF NOT EXISTS idx_tcs_chat_history_whatsapp_id ON tcs_chat_history 
 
 DROP TRIGGER IF EXISTS update_tcs_leads_updated_at ON tcs_leads;
 CREATE TRIGGER update_tcs_leads_updated_at BEFORE UPDATE ON tcs_leads
-    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+    FOR EACH ROW EXECUTE FUNCTION public.tcs_set_updated_at();

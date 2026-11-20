@@ -26,10 +26,10 @@ def _parse(lines: list[str]) -> dict[str, float]:
 async def _cleanup(factory) -> None:
     async with factory() as session:
         await session.execute(
-            text("DELETE FROM crm_outbox WHERE whatsapp_id LIKE :p"), {"p": PREFIX + "%"}
+            text("DELETE FROM tcs_crm_outbox WHERE whatsapp_id LIKE :p"), {"p": PREFIX + "%"}
         )
         await session.execute(
-            text("DELETE FROM crm_conversation_state WHERE whatsapp_id LIKE :p"),
+            text("DELETE FROM tcs_crm_conversation_state WHERE whatsapp_id LIKE :p"),
             {"p": PREFIX + "%"},
         )
         await session.commit()
@@ -46,14 +46,15 @@ async def test_ops_gauges_report_backlog_and_unanswered(settings):
         async with factory() as session:
             await session.execute(
                 text(
-                    "INSERT INTO crm_outbox (id, whatsapp_id, body, status, created_at)"
+                    "INSERT INTO tcs_crm_outbox (id, whatsapp_id, body, status, created_at)"
                     " VALUES (gen_random_uuid(), :wa, 'x', 'queued', :at)"
                 ),
                 {"wa": PREFIX + "queued@c.us", "at": old},
             )
             await session.execute(
                 text(
-                    "INSERT INTO crm_outbox (id, whatsapp_id, body, status, created_at, claimed_at)"
+                    "INSERT INTO tcs_crm_outbox"
+                    " (id, whatsapp_id, body, status, created_at, claimed_at)"
                     " VALUES (gen_random_uuid(), :wa, 'x', 'sending', :at, :at)"
                 ),
                 {"wa": PREFIX + "sending@c.us", "at": old},
@@ -61,7 +62,7 @@ async def test_ops_gauges_report_backlog_and_unanswered(settings):
             for wa, paused in ((PREFIX + "open@c.us", False), (PREFIX + "paused@c.us", True)):
                 await session.execute(
                     text(
-                        "INSERT INTO crm_conversation_state"
+                        "INSERT INTO tcs_crm_conversation_state"
                         " (whatsapp_id, bot_paused, last_message_direction, last_message_at)"
                         " VALUES (:wa, :paused, 'in', :at)"
                     ),
@@ -75,8 +76,8 @@ async def test_ops_gauges_report_backlog_and_unanswered(settings):
         async with factory() as session:
             values = _parse(await ops_gauges(session, bus_local))
 
-        assert values['crm_outbox_oldest_due_seconds{status="queued"}'] >= 3500
-        assert values['crm_outbox_oldest_due_seconds{status="sending"}'] >= 3500
+        assert values['tcs_crm_outbox_oldest_due_seconds{status="queued"}'] >= 3500
+        assert values['tcs_crm_outbox_oldest_due_seconds{status="sending"}'] >= 3500
         assert values["crm_unanswered_dialogs"] == before + 1
         assert values["crm_sse_subscribers"] == 1
         assert values["crm_realtime_poll_age_seconds"] < 60

@@ -13,15 +13,15 @@ from .base import Base
 class CrmSavedView(Base):
     """Saved filter set for an entity (personal or shared)."""
 
-    __tablename__ = "crm_saved_views"
+    __tablename__ = "tcs_crm_saved_views"
     __table_args__ = (
-        CheckConstraint("entity IN ('deal', 'contact')", name="ck_crm_saved_views_entity"),
+        CheckConstraint("entity IN ('deal', 'contact')", name="ck_tcs_crm_saved_views_entity"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("crm_users.id", ondelete="SET NULL"),
+        ForeignKey("tcs_crm_users.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )

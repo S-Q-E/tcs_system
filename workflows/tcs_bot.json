@@ -95,7 +95,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT COALESCE((SELECT bot_paused FROM crm_conversation_state WHERE whatsapp_id = $1), false) AS bot_paused;",
+        "query": "SELECT COALESCE((SELECT bot_paused FROM tcs_crm_conversation_state WHERE whatsapp_id = $1), false) AS bot_paused;",
         "options": {
           "queryReplacement": "={{ [ $('Normalize Message').item.json.whatsapp_id ] }}"
         }
@@ -615,7 +615,7 @@
     },
     {
       "parameters": {
-        "content": "## TCS Leasing Bot (Telegram)\n1. Import: Workflows -> Import from file. Attach credentials in the UI:\n   `Postgres account` (demo DB), `Telegram account` (NEW demo bot), `OpenRouter account` (model).\n2. MANUAL after import (see HUMAN_TODO.md): verify the Telegram Trigger output shape, the Postgres Tool nodes (search_units, book_viewing, handoff_to_human) and the Code Tool get_slots. Rebuild them from docs/tcs/tools-spec.md if your n8n version differs.\n3. Schema and demo data come from scripts/seed_tcs_demo.py; do not run schema nodes here.\n4. The bot writes tcs_leads / tcs_messages / tcs_events; the CRM reads them.\n5. Bot paused = crm_conversation_state.bot_paused; a manager reply pauses the bot automatically in the CRM.",
+        "content": "## TCS Leasing Bot (Telegram)\n1. Import: Workflows -> Import from file. Attach credentials in the UI:\n   `Postgres account` (demo DB), `Telegram account` (NEW demo bot), `OpenRouter account` (model).\n2. MANUAL after import (see HUMAN_TODO.md): verify the Telegram Trigger output shape, the Postgres Tool nodes (search_units, book_viewing, handoff_to_human) and the Code Tool get_slots. Rebuild them from docs/tcs/tools-spec.md if your n8n version differs.\n3. Schema and demo data come from scripts/seed_tcs_demo.py; do not run schema nodes here.\n4. The bot writes tcs_leads / tcs_messages / tcs_events; the CRM reads them.\n5. Bot paused = tcs_crm_conversation_state.bot_paused; a manager reply pauses the bot automatically in the CRM.",
         "height": 320,
         "width": 460,
         "color": 4

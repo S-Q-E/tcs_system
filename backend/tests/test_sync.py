@@ -50,7 +50,7 @@ async def _purge(factory, numbers: list[int]) -> None:
         contacts = (
             (
                 await session.execute(
-                    text("SELECT id FROM crm_contacts WHERE whatsapp_id = ANY(:ids)"),
+                    text("SELECT id FROM tcs_crm_contacts WHERE whatsapp_id = ANY(:ids)"),
                     {"ids": ids},
                 )
             )
@@ -62,7 +62,8 @@ async def _purge(factory, numbers: list[int]) -> None:
             deals += (
                 (
                     await session.execute(
-                        text("SELECT id FROM crm_deals WHERE contact_id = :id"), {"id": contact_id}
+                        text("SELECT id FROM tcs_crm_deals WHERE contact_id = :id"),
+                        {"id": contact_id},
                     )
                 )
                 .scalars()
@@ -70,23 +71,23 @@ async def _purge(factory, numbers: list[int]) -> None:
             )
         for deal_id in deals:
             await session.execute(
-                text("DELETE FROM crm_deal_stage_history WHERE deal_id = :id"), {"id": deal_id}
+                text("DELETE FROM tcs_crm_deal_stage_history WHERE deal_id = :id"), {"id": deal_id}
             )
             await session.execute(
-                text("DELETE FROM crm_activity_log WHERE entity_id = :id"), {"id": deal_id}
+                text("DELETE FROM tcs_crm_activity_log WHERE entity_id = :id"), {"id": deal_id}
             )
         for contact_id in contacts:
             await session.execute(
-                text("DELETE FROM crm_activity_log WHERE entity_id = :id"), {"id": contact_id}
+                text("DELETE FROM tcs_crm_activity_log WHERE entity_id = :id"), {"id": contact_id}
             )
             await session.execute(
-                text("DELETE FROM crm_deals WHERE contact_id = :id"), {"id": contact_id}
+                text("DELETE FROM tcs_crm_deals WHERE contact_id = :id"), {"id": contact_id}
             )
             await session.execute(
-                text("DELETE FROM crm_contacts WHERE id = :id"), {"id": contact_id}
+                text("DELETE FROM tcs_crm_contacts WHERE id = :id"), {"id": contact_id}
             )
         await session.execute(
-            text("DELETE FROM crm_conversation_state WHERE whatsapp_id = ANY(:ids)"),
+            text("DELETE FROM tcs_crm_conversation_state WHERE whatsapp_id = ANY(:ids)"),
             {"ids": ids},
         )
         await session.execute(
@@ -111,8 +112,8 @@ async def _deal_info(factory, wa: str) -> dict:
                         " d.custom, s.name AS stage, s.kind, s.bot_stage_key,"
                         " c.name AS contact_name, c.phone AS contact_phone,"
                         " c.source AS contact_source, c.custom AS contact_custom"
-                        " FROM crm_deals d JOIN crm_stages s ON s.id = d.stage_id"
-                        " JOIN crm_contacts c ON c.id = d.contact_id"
+                        " FROM tcs_crm_deals d JOIN tcs_crm_stages s ON s.id = d.stage_id"
+                        " JOIN tcs_crm_contacts c ON c.id = d.contact_id"
                         " WHERE c.whatsapp_id = :wa"
                         " AND d.deleted_at IS NULL"
                         " ORDER BY d.updated_at DESC LIMIT 1"
@@ -129,11 +130,11 @@ async def _deal_info(factory, wa: str) -> dict:
 async def _counts(factory) -> dict:
     async with factory() as session:
         tables = (
-            "crm_contacts",
-            "crm_deals",
-            "crm_deal_stage_history",
-            "crm_conversation_state",
-            "crm_activity_log",
+            "tcs_crm_contacts",
+            "tcs_crm_deals",
+            "tcs_crm_deal_stage_history",
+            "tcs_crm_conversation_state",
+            "tcs_crm_activity_log",
         )
         out = {}
         for table in tables:
@@ -173,12 +174,15 @@ async def test_backfill_seed_leads(settings):
 
         async with factory() as session:
             states = (
-                await session.execute(text("SELECT COUNT(*) FROM crm_conversation_state"))
+                await session.execute(text("SELECT COUNT(*) FROM tcs_crm_conversation_state"))
             ).scalar()
             assert states >= 6
             synced = (
                 await session.execute(
-                    text("SELECT value FROM crm_settings WHERE key = 'sync_worker.last_synced_at'")
+                    text(
+                        "SELECT value FROM tcs_crm_settings"
+                        " WHERE key = 'sync_worker.last_synced_at'"
+                    )
                 )
             ).scalar()
             assert synced is not None
@@ -235,9 +239,9 @@ async def test_bot_stage_move_writes_history(settings):
                     (
                         await session.execute(
                             text(
-                                "SELECT h.source FROM crm_deal_stage_history h"
-                                " JOIN crm_deals d ON d.id = h.deal_id"
-                                " JOIN crm_contacts c ON c.id = d.contact_id"
+                                "SELECT h.source FROM tcs_crm_deal_stage_history h"
+                                " JOIN tcs_crm_deals d ON d.id = h.deal_id"
+                                " JOIN tcs_crm_contacts c ON c.id = d.contact_id"
                                 " WHERE c.whatsapp_id = :wa ORDER BY h.at"
                             ),
                             {"wa": wa},
@@ -265,15 +269,15 @@ async def test_stage_locked_blocks_move_but_logs(settings):
                 deal_id = (
                     await session.execute(
                         text(
-                            "SELECT d.id FROM crm_deals d"
-                            " JOIN crm_contacts c ON c.id = d.contact_id"
+                            "SELECT d.id FROM tcs_crm_deals d"
+                            " JOIN tcs_crm_contacts c ON c.id = d.contact_id"
                             " WHERE c.whatsapp_id = :wa"
                         ),
                         {"wa": wa},
                     )
                 ).scalar_one()
                 await session.execute(
-                    text("UPDATE crm_deals SET stage_locked = TRUE WHERE id = :id"),
+                    text("UPDATE tcs_crm_deals SET stage_locked = TRUE WHERE id = :id"),
                     {"id": deal_id},
                 )
                 await session.execute(
@@ -285,21 +289,21 @@ async def test_stage_locked_blocks_move_but_logs(settings):
                 )
                 await session.commit()
 
-            history_before = (await _counts(factory))["crm_deal_stage_history"]
+            history_before = (await _counts(factory))["tcs_crm_deal_stage_history"]
             stats = await run_sync_cycle(factory)
             assert stats.moved == 0
             assert stats.blocked == 1
 
             info = await _deal_info(factory, wa)
             assert info["bot_stage_key"] == "QUALIFIED"
-            assert (await _counts(factory))["crm_deal_stage_history"] == history_before
+            assert (await _counts(factory))["tcs_crm_deal_stage_history"] == history_before
 
             async with factory() as session:
                 blocked = (
                     (
                         await session.execute(
                             text(
-                                "SELECT action, diff FROM crm_activity_log"
+                                "SELECT action, diff FROM tcs_crm_activity_log"
                                 " WHERE entity = 'deal' AND entity_id = :id"
                                 " ORDER BY created_at DESC LIMIT 1"
                             ),
@@ -390,16 +394,16 @@ async def test_manager_edits_survive_unchanged_bot_sync(settings):
             async with factory() as session:
                 await session.execute(
                     text(
-                        "UPDATE crm_contacts SET name = 'Manager Edited',"
+                        "UPDATE tcs_crm_contacts SET name = 'Manager Edited',"
                         " custom = custom || :patch WHERE whatsapp_id = :wa"
                     ),
                     {"wa": wa, "patch": '{"manager_note": "keep me", "vip": true}'},
                 )
                 await session.execute(
                     text(
-                        "UPDATE crm_deals SET trial_at = :trial,"
+                        "UPDATE tcs_crm_deals SET trial_at = :trial,"
                         " custom = custom || :patch WHERE contact_id ="
-                        " (SELECT id FROM crm_contacts WHERE whatsapp_id = :wa)"
+                        " (SELECT id FROM tcs_crm_contacts WHERE whatsapp_id = :wa)"
                     ),
                     {
                         "wa": wa,
@@ -442,16 +446,16 @@ async def test_bot_changes_still_apply_but_manual_keys_survive(settings):
             async with factory() as session:
                 await session.execute(
                     text(
-                        "UPDATE crm_contacts SET custom = custom || :patch"
+                        "UPDATE tcs_crm_contacts SET custom = custom || :patch"
                         " WHERE whatsapp_id = :wa"
                     ),
                     {"wa": wa, "patch": '{"manager_note": "keep me"}'},
                 )
                 await session.execute(
                     text(
-                        "UPDATE crm_deals SET custom = custom || :patch"
+                        "UPDATE tcs_crm_deals SET custom = custom || :patch"
                         " WHERE contact_id ="
-                        " (SELECT id FROM crm_contacts WHERE whatsapp_id = :wa)"
+                        " (SELECT id FROM tcs_crm_contacts WHERE whatsapp_id = :wa)"
                     ),
                     {"wa": wa, "patch": '{"manager_note": "keep me"}'},
                 )
@@ -559,7 +563,7 @@ async def test_bot_phone_source_and_lead_data_sync(settings):
             async with factory() as session:
                 await session.execute(
                     text(
-                        "UPDATE crm_contacts SET phone = '+1 215 555 0111',"
+                        "UPDATE tcs_crm_contacts SET phone = '+1 215 555 0111',"
                         " source = 'manual' WHERE whatsapp_id = :wa"
                     ),
                     {"wa": wa},
@@ -591,40 +595,40 @@ async def _purge_load(factory) -> None:
     async with factory() as session:
         await session.execute(
             text(
-                "DELETE FROM crm_deal_stage_history WHERE deal_id IN"
-                " (SELECT d.id FROM crm_deals d JOIN crm_contacts c ON c.id = d.contact_id"
+                "DELETE FROM tcs_crm_deal_stage_history WHERE deal_id IN"
+                " (SELECT d.id FROM tcs_crm_deals d JOIN tcs_crm_contacts c ON c.id = d.contact_id"
                 " WHERE c.whatsapp_id LIKE :pattern)"
             ),
             {"pattern": pattern},
         )
         await session.execute(
             text(
-                "DELETE FROM crm_activity_log WHERE entity_id IN"
-                " (SELECT d.id FROM crm_deals d JOIN crm_contacts c ON c.id = d.contact_id"
+                "DELETE FROM tcs_crm_activity_log WHERE entity_id IN"
+                " (SELECT d.id FROM tcs_crm_deals d JOIN tcs_crm_contacts c ON c.id = d.contact_id"
                 " WHERE c.whatsapp_id LIKE :pattern)"
             ),
             {"pattern": pattern},
         )
         await session.execute(
             text(
-                "DELETE FROM crm_activity_log WHERE entity_id IN"
-                " (SELECT id FROM crm_contacts WHERE whatsapp_id LIKE :pattern)"
+                "DELETE FROM tcs_crm_activity_log WHERE entity_id IN"
+                " (SELECT id FROM tcs_crm_contacts WHERE whatsapp_id LIKE :pattern)"
             ),
             {"pattern": pattern},
         )
         await session.execute(
             text(
-                "DELETE FROM crm_deals WHERE contact_id IN"
-                " (SELECT id FROM crm_contacts WHERE whatsapp_id LIKE :pattern)"
+                "DELETE FROM tcs_crm_deals WHERE contact_id IN"
+                " (SELECT id FROM tcs_crm_contacts WHERE whatsapp_id LIKE :pattern)"
             ),
             {"pattern": pattern},
         )
         await session.execute(
-            text("DELETE FROM crm_contacts WHERE whatsapp_id LIKE :pattern"),
+            text("DELETE FROM tcs_crm_contacts WHERE whatsapp_id LIKE :pattern"),
             {"pattern": pattern},
         )
         await session.execute(
-            text("DELETE FROM crm_conversation_state WHERE whatsapp_id LIKE :pattern"),
+            text("DELETE FROM tcs_crm_conversation_state WHERE whatsapp_id LIKE :pattern"),
             {"pattern": pattern},
         )
         for table in ("tcs_messages", "tcs_events", "tcs_followups"):
@@ -679,14 +683,14 @@ async def test_load_idle_cycle_under_one_second(settings):
                 pattern = f"{LOAD_WA_PREFIX}%"
                 synced_contacts = (
                     await session.execute(
-                        text("SELECT COUNT(*) FROM crm_contacts WHERE whatsapp_id LIKE :p"),
+                        text("SELECT COUNT(*) FROM tcs_crm_contacts WHERE whatsapp_id LIKE :p"),
                         {"p": pattern},
                     )
                 ).scalar()
                 synced_deals = (
                     await session.execute(
                         text(
-                            "SELECT COUNT(*) FROM crm_deals d JOIN crm_contacts c"
+                            "SELECT COUNT(*) FROM tcs_crm_deals d JOIN tcs_crm_contacts c"
                             " ON c.id = d.contact_id WHERE c.whatsapp_id LIKE :p"
                             " AND d.deleted_at IS NULL"
                         ),
@@ -714,9 +718,9 @@ async def test_seed_is_idempotent(tx_session):
     await tx_session.run_sync(seed_default_funnel)
     counts = {}
     for table, expected in (
-        ("crm_pipelines", 1),
-        ("crm_stages", 6),
-        ("crm_lost_reasons", 5),
+        ("tcs_crm_pipelines", 1),
+        ("tcs_crm_stages", 6),
+        ("tcs_crm_lost_reasons", 5),
     ):
         counts[table] = (await tx_session.execute(text(f"SELECT COUNT(*) FROM {table}"))).scalar()
         assert counts[table] == expected, (table, counts[table])
@@ -749,7 +753,7 @@ async def test_lifespan_starts_worker_when_enabled(settings):
                     async with factory() as session:
                         found = (
                             await session.execute(
-                                text("SELECT id FROM crm_contacts WHERE whatsapp_id = :wa"),
+                                text("SELECT id FROM tcs_crm_contacts WHERE whatsapp_id = :wa"),
                                 {"wa": wa},
                             )
                         ).scalar_one_or_none()

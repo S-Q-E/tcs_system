@@ -37,8 +37,8 @@ pg_restore --dbname="$DATABASE_URL" --no-owner --single-transaction \
   tcs-leasing-crm-<STAMP>.dump
 
 # 4. Verify: alembic version table + row counts.
-psql "$DATABASE_URL" -c "SELECT version_num FROM crm_alembic_version;"
-psql "$DATABASE_URL" -c "SELECT COUNT(*) FROM crm_users; SELECT COUNT(*) FROM tcs_leads;"
+psql "$DATABASE_URL" -c "SELECT version_num FROM tcs_crm_alembic_version;"
+psql "$DATABASE_URL" -c "SELECT COUNT(*) FROM tcs_crm_users; SELECT COUNT(*) FROM tcs_leads;"
 
 # 5. Redeploy / scale back up. Migrations run on boot; a restore at an older
 #    migration state upgrades itself forward automatically.
@@ -46,10 +46,10 @@ psql "$DATABASE_URL" -c "SELECT COUNT(*) FROM crm_users; SELECT COUNT(*) FROM tc
 
 ## Restore checks
 
-- `crm_alembic_version` matches the deployed code's `head` (or older — boot
+- `tcs_crm_alembic_version` matches the deployed code's `head` (or older — boot
   migrates forward; never restore a *newer* DB under *older* code without
   `alembic downgrade`).
-- Spot-check counts: `crm_users`, `crm_deals`, `tcs_leads`, `tcs_messages`.
+- Spot-check counts: `tcs_crm_users`, `tcs_crm_deals`, `tcs_leads`, `tcs_messages`.
 - Log in as admin, open board + one dialog + analytics overview.
 
 ## Off-site copies

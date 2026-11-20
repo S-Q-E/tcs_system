@@ -62,11 +62,11 @@ async def _insert_lead(factory, wa: str) -> None:
 async def _purge(factory, was: list[str], contact_ids: list[str]) -> None:
     async with factory() as session:
         await session.execute(
-            text("DELETE FROM crm_conversation_state WHERE whatsapp_id = ANY(:ids)"),
+            text("DELETE FROM tcs_crm_conversation_state WHERE whatsapp_id = ANY(:ids)"),
             {"ids": was},
         )
         await session.execute(
-            text("DELETE FROM crm_outbox WHERE whatsapp_id = ANY(:ids)"), {"ids": was}
+            text("DELETE FROM tcs_crm_outbox WHERE whatsapp_id = ANY(:ids)"), {"ids": was}
         )
         await session.execute(
             text("DELETE FROM tcs_messages WHERE whatsapp_id = ANY(:ids)"), {"ids": was}
@@ -85,7 +85,7 @@ async def _contact_ids(factory, was: list[str]) -> list[str]:
     async with factory() as session:
         rows = (
             await session.execute(
-                text("SELECT id FROM crm_contacts WHERE whatsapp_id = ANY(:ids)"), {"ids": was}
+                text("SELECT id FROM tcs_crm_contacts WHERE whatsapp_id = ANY(:ids)"), {"ids": was}
             )
         ).scalars()
         return [str(r) for r in rows]
@@ -96,14 +96,14 @@ async def _set_restrict(factory, enabled: bool) -> None:
         if enabled:
             await session.execute(
                 text(
-                    "INSERT INTO crm_settings (key, value) VALUES"
+                    "INSERT INTO tcs_crm_settings (key, value) VALUES"
                     " ('restrict_managers_to_own', 'true')"
                     " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
                 )
             )
         else:
             await session.execute(
-                text("DELETE FROM crm_settings WHERE key = 'restrict_managers_to_own'")
+                text("DELETE FROM tcs_crm_settings WHERE key = 'restrict_managers_to_own'")
             )
         await session.commit()
 
@@ -119,18 +119,18 @@ async def _setup_matrix(client, factory, token, owner_id: str) -> tuple[str, str
     async with factory() as session:
         contacts = (
             await session.execute(
-                text("SELECT id, whatsapp_id FROM crm_contacts WHERE whatsapp_id = ANY(:ids)"),
+                text("SELECT id, whatsapp_id FROM tcs_crm_contacts WHERE whatsapp_id = ANY(:ids)"),
                 {"ids": [wa_own, wa_free]},
             )
         ).mappings()
         by_wa = {row["whatsapp_id"]: row["id"] for row in contacts}
         await session.execute(
-            text("UPDATE crm_contacts SET owner_id = :owner WHERE id = :id"),
+            text("UPDATE tcs_crm_contacts SET owner_id = :owner WHERE id = :id"),
             {"owner": owner_id, "id": by_wa[wa_own]},
         )
         await session.execute(
             text(
-                "UPDATE crm_deals SET owner_id = :owner WHERE contact_id = :id",
+                "UPDATE tcs_crm_deals SET owner_id = :owner WHERE contact_id = :id",
                 # noqa: E501
             ),
             {"owner": owner_id, "id": by_wa[wa_own]},
@@ -374,7 +374,7 @@ async def _contact_ids_by_name(factory, secret: str) -> list[str]:
     async with factory() as session:
         rows = (
             await session.execute(
-                text("SELECT id FROM crm_contacts WHERE name LIKE :p"), {"p": f"{secret}%"}
+                text("SELECT id FROM tcs_crm_contacts WHERE name LIKE :p"), {"p": f"{secret}%"}
             )
         ).scalars()
         return [str(r) for r in rows]
@@ -384,8 +384,10 @@ async def _purge_scope_rows(factory, secret: str, job_id: str | None) -> None:
     async with factory() as session:
         if job_id is not None:
             await session.execute(
-                text("DELETE FROM crm_activity_log WHERE entity_id = :id"), {"id": job_id}
+                text("DELETE FROM tcs_crm_activity_log WHERE entity_id = :id"), {"id": job_id}
             )
-            await session.execute(text("DELETE FROM crm_imports WHERE id = :id"), {"id": job_id})
+            await session.execute(
+                text("DELETE FROM tcs_crm_imports WHERE id = :id"), {"id": job_id}
+            )
         await session.commit()
     await purge_contacts(factory, await _contact_ids_by_name(factory, secret))

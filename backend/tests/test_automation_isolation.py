@@ -39,8 +39,8 @@ async def _lead_with_deal(factory, wa: str) -> tuple[str, str]:
         row = (
             await session.execute(
                 text(
-                    "SELECT d.id, d.stage_id FROM crm_deals d"
-                    " JOIN crm_contacts c ON c.id = d.contact_id WHERE c.whatsapp_id = :wa"
+                    "SELECT d.id, d.stage_id FROM tcs_crm_deals d"
+                    " JOIN tcs_crm_contacts c ON c.id = d.contact_id WHERE c.whatsapp_id = :wa"
                 ),
                 {"wa": wa},
             )
@@ -52,19 +52,20 @@ async def _cleanup(factory, wa: str, automation_ids: list[str], tag_ids: list[st
     async with factory() as session:
         for automation_id in automation_ids:
             await session.execute(
-                text("DELETE FROM crm_automations WHERE id = :id"), {"id": automation_id}
+                text("DELETE FROM tcs_crm_automations WHERE id = :id"), {"id": automation_id}
             )
         for tag_id in tag_ids:
             await session.execute(
-                text("DELETE FROM crm_entity_tags WHERE tag_id = :id"), {"id": tag_id}
+                text("DELETE FROM tcs_crm_entity_tags WHERE tag_id = :id"), {"id": tag_id}
             )
-            await session.execute(text("DELETE FROM crm_tags WHERE id = :id"), {"id": tag_id})
+            await session.execute(text("DELETE FROM tcs_crm_tags WHERE id = :id"), {"id": tag_id})
         await session.execute(
-            text("DELETE FROM crm_notifications WHERE payload->>'task_id' = :id"), {"id": task_id}
+            text("DELETE FROM tcs_crm_notifications WHERE payload->>'task_id' = :id"),
+            {"id": task_id},
         )
-        await session.execute(text("DELETE FROM crm_tasks WHERE id = :id"), {"id": task_id})
+        await session.execute(text("DELETE FROM tcs_crm_tasks WHERE id = :id"), {"id": task_id})
         await session.execute(
-            text("DELETE FROM crm_conversation_state WHERE whatsapp_id = :wa"), {"wa": wa}
+            text("DELETE FROM tcs_crm_conversation_state WHERE whatsapp_id = :wa"), {"wa": wa}
         )
         await session.execute(text("DELETE FROM tcs_messages WHERE whatsapp_id = :wa"), {"wa": wa})
         await session.execute(text("DELETE FROM tcs_events WHERE whatsapp_id = :wa"), {"wa": wa})
@@ -73,7 +74,7 @@ async def _cleanup(factory, wa: str, automation_ids: list[str], tag_ids: list[st
         contacts = (
             (
                 await session.execute(
-                    text("SELECT id FROM crm_contacts WHERE whatsapp_id = :wa"), {"wa": wa}
+                    text("SELECT id FROM tcs_crm_contacts WHERE whatsapp_id = :wa"), {"wa": wa}
                 )
             )
             .scalars()
@@ -87,7 +88,7 @@ async def _add_overdue_task(factory, assignee_id: str) -> str:
     async with factory() as session:
         await session.execute(
             text(
-                "INSERT INTO crm_tasks (id, title, type, due_at, assignee_id)"
+                "INSERT INTO tcs_crm_tasks (id, title, type, due_at, assignee_id)"
                 " VALUES (:id, 'B06 overdue', 'message', :due, :assignee)"
             ),
             {
@@ -105,7 +106,8 @@ async def _add_automation(factory, stage_id: str, actions: list[dict]) -> str:
     async with factory() as session:
         await session.execute(
             text(
-                "INSERT INTO crm_automations (id, name, is_active, trigger_type, trigger_config,"
+                "INSERT INTO tcs_crm_automations"
+                " (id, name, is_active, trigger_type, trigger_config,"
                 " actions) VALUES (:id, 'B06 automation', TRUE, 'deal_entered_stage',"
                 " CAST(:config AS jsonb), CAST(:actions AS jsonb))"
             ),
@@ -124,7 +126,7 @@ async def _overdue_count(factory, task_id: str) -> int:
         return (
             await session.execute(
                 text(
-                    "SELECT COUNT(*) FROM crm_notifications"
+                    "SELECT COUNT(*) FROM tcs_crm_notifications"
                     " WHERE type = 'task_overdue' AND payload->>'task_id' = :id"
                 ),
                 {"id": task_id},
@@ -146,12 +148,12 @@ async def test_duplicate_tag_action_does_not_stop_notify_cycle(client, settings)
         tag_ids.append(tag_id)
         async with factory() as session:
             await session.execute(
-                text("INSERT INTO crm_tags (id, name) VALUES (:id, :name)"),
+                text("INSERT INTO tcs_crm_tags (id, name) VALUES (:id, :name)"),
                 {"id": tag_id, "name": f"b06-{tag_id[:8]}"},
             )
             await session.execute(
                 text(
-                    "INSERT INTO crm_entity_tags (id, tag_id, entity, entity_id)"
+                    "INSERT INTO tcs_crm_entity_tags (id, tag_id, entity, entity_id)"
                     " VALUES (:id, :tag, 'deal', :deal)"
                 ),
                 {"id": str(uuid.uuid4()), "tag": tag_id, "deal": deal_id},

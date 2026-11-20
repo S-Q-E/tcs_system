@@ -109,7 +109,7 @@ async def test_duplicates_and_merge(client, settings):
                 (
                     await session.execute(
                         text(
-                            "SELECT diff FROM crm_activity_log WHERE entity='contact'"
+                            "SELECT diff FROM tcs_crm_activity_log WHERE entity='contact'"
                             " AND entity_id=:id AND action='contact_merged'"
                         ),
                         {"id": first["id"]},
@@ -119,8 +119,8 @@ async def test_duplicates_and_merge(client, settings):
                 .one_or_none()
             )
         assert row is not None
-        await purge_rows(factory, "crm_notes", [note["id"]])
-        await purge_rows(factory, "crm_tasks", [task["id"]])
+        await purge_rows(factory, "tcs_crm_notes", [note["id"]])
+        await purge_rows(factory, "tcs_crm_tasks", [task["id"]])
     finally:
         await purge_contacts(factory, contact_ids)
         await engine.dispose()
@@ -148,7 +148,7 @@ async def test_contacts_bulk_tags_owner_delete(client, settings):
         assert bulk.json() == {"updated": 2}
         fetched = await client.get(f"/api/contacts/{first['id']}")
         assert any(t["id"] == tag["id"] for t in fetched.json()["tags"])
-        await purge_rows(factory, "crm_tags", [tag["id"]])
+        await purge_rows(factory, "tcs_crm_tags", [tag["id"]])
     finally:
         await purge_contacts(factory, contact_ids)
         await engine.dispose()
@@ -283,7 +283,7 @@ async def test_stale_import_jobs_are_failed_on_startup(settings):
             ):
                 await session.execute(
                     text(
-                        "INSERT INTO crm_imports (id, entity, status, mapping, created_at)"
+                        "INSERT INTO tcs_crm_imports (id, entity, status, mapping, created_at)"
                         " VALUES (:id, 'contact', 'running', '{}', :at)"
                     ),
                     {"id": job_id, "at": now - age},
@@ -295,7 +295,7 @@ async def test_stale_import_jobs_are_failed_on_startup(settings):
                 (
                     await session.execute(
                         text(
-                            "SELECT id::text, status FROM crm_imports WHERE id IN"
+                            "SELECT id::text, status FROM tcs_crm_imports WHERE id IN"
                             " (CAST(:a AS uuid), CAST(:b AS uuid))"
                         ),
                         {"a": stale_id, "b": fresh_id},
@@ -306,7 +306,9 @@ async def test_stale_import_jobs_are_failed_on_startup(settings):
     finally:
         async with factory() as session:
             await session.execute(
-                text("DELETE FROM crm_imports WHERE id IN (CAST(:a AS uuid), CAST(:b AS uuid))"),
+                text(
+                    "DELETE FROM tcs_crm_imports WHERE id IN (CAST(:a AS uuid), CAST(:b AS uuid))"
+                ),
                 {"a": stale_id, "b": fresh_id},
             )
             await session.commit()

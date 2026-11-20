@@ -13,12 +13,12 @@ from .base import Base
 class CrmNotification(Base):
     """User notification (bell). Payload carries links and a dedupe key."""
 
-    __tablename__ = "crm_notifications"
+    __tablename__ = "tcs_crm_notifications"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("crm_users.id", ondelete="CASCADE"),
+        ForeignKey("tcs_crm_users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -34,11 +34,11 @@ class CrmNotification(Base):
 class CrmAutomation(Base):
     """Simple if-then rule executed by the worker (see D15)."""
 
-    __tablename__ = "crm_automations"
+    __tablename__ = "tcs_crm_automations"
     __table_args__ = (
         CheckConstraint(
             "trigger_type IN ('deal_entered_stage', 'no_activity_hours')",
-            name="ck_crm_automations_trigger",
+            name="ck_tcs_crm_automations_trigger",
         ),
     )
 

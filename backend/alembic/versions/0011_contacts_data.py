@@ -14,7 +14,7 @@ depends_on = None
 
 def upgrade() -> None:
     op.create_table(
-        "crm_imports",
+        "tcs_crm_imports",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("entity", sa.Text(), nullable=False),
         sa.Column("status", sa.Text(), nullable=False, server_default="queued"),
@@ -26,7 +26,7 @@ def upgrade() -> None:
         sa.Column(
             "created_by",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_users.id", ondelete="SET NULL"),
+            sa.ForeignKey("tcs_crm_users.id", ondelete="SET NULL"),
             nullable=True,
         ),
         sa.Column(
@@ -38,11 +38,11 @@ def upgrade() -> None:
         sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
         sa.CheckConstraint(
             "status IN ('queued', 'running', 'done', 'failed')",
-            name="ck_crm_imports_status",
+            name="ck_tcs_crm_imports_status",
         ),
-        sa.CheckConstraint("entity IN ('contact', 'deal')", name="ck_crm_imports_entity"),
+        sa.CheckConstraint("entity IN ('contact', 'deal')", name="ck_tcs_crm_imports_entity"),
     )
 
 
 def downgrade() -> None:
-    op.drop_table("crm_imports")
+    op.drop_table("tcs_crm_imports")

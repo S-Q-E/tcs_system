@@ -33,7 +33,7 @@ STATUS_LOST = "LOST"
 class CrmPipeline(Base):
     """Sales pipeline (kanban board)."""
 
-    __tablename__ = "crm_pipelines"
+    __tablename__ = "tcs_crm_pipelines"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
@@ -44,16 +44,16 @@ class CrmPipeline(Base):
 class CrmStage(Base):
     """Pipeline stage. bot_stage_key/bot_status_key link to the n8n funnel."""
 
-    __tablename__ = "crm_stages"
+    __tablename__ = "tcs_crm_stages"
     __table_args__ = (
-        CheckConstraint("kind IN ('open', 'won', 'lost')", name="ck_crm_stages_kind"),
-        UniqueConstraint("pipeline_id", "name", name="uq_crm_stages_pipeline_name"),
+        CheckConstraint("kind IN ('open', 'won', 'lost')", name="ck_tcs_crm_stages_kind"),
+        UniqueConstraint("pipeline_id", "name", name="uq_tcs_crm_stages_pipeline_name"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     pipeline_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("crm_pipelines.id", ondelete="CASCADE"),
+        ForeignKey("tcs_crm_pipelines.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )

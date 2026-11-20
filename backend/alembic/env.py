@@ -43,8 +43,8 @@ settings = Settings()
 
 # Serializes concurrent `upgrade head` runs (several containers booting at
 # once after a deploy). Same numeric namespace as the worker locks
-# (91030001-91030003 in workers/); this key is used only here.
-MIGRATION_LOCK_KEY = 91030000
+# (92030001-92030003 in workers/); this key is used only here.
+MIGRATION_LOCK_KEY = 92030000
 
 
 def do_run_migrations(connection) -> None:

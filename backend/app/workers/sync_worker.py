@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 # Advisory-lock key for the sync worker (bigint). The session-scoped variant
 # is held for the whole cycle while every lead batch commits independently,
 # so a crash never rolls back completed batches and never blocks bot tables.
-SYNC_LOCK_KEY = 91030001
+SYNC_LOCK_KEY = 92030001
 SETTINGS_KEY_LAST_SYNCED = "sync_worker.last_synced_at"
 SETTINGS_KEY_LAST_FULL = "sync_worker.last_full_synced_at"
 BATCH_SIZE = 500
@@ -357,7 +357,7 @@ async def _load_marker(session: AsyncSession, key: str) -> datetime | None:
 async def _store_marker(session: AsyncSession, key: str, when: datetime) -> None:
     await session.execute(
         text(
-            "INSERT INTO crm_settings (key, value) VALUES (:key, CAST(:value AS jsonb))"
+            "INSERT INTO tcs_crm_settings (key, value) VALUES (:key, CAST(:value AS jsonb))"
             " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
         ),
         {"key": key, "value": json.dumps(when.isoformat())},
@@ -651,7 +651,7 @@ async def _unread_counts(session: AsyncSession, wa_ids: list[str]) -> dict[str, 
             text(
                 "SELECT m.whatsapp_id AS wa, COUNT(*) AS cnt"
                 " FROM tcs_messages m"
-                " JOIN crm_conversation_state s ON s.whatsapp_id = m.whatsapp_id"
+                " JOIN tcs_crm_conversation_state s ON s.whatsapp_id = m.whatsapp_id"
                 " WHERE m.whatsapp_id = ANY(:ids)"
                 " AND m.direction = 'in'"
                 " AND s.last_read_at IS NOT NULL"
@@ -796,7 +796,9 @@ def _count_terminal(stats: SyncStats, status: str) -> None:
 
 async def _get_setting(session: AsyncSession, key: str) -> Any:
     return (
-        await session.execute(text("SELECT value FROM crm_settings WHERE key = :key"), {"key": key})
+        await session.execute(
+            text("SELECT value FROM tcs_crm_settings WHERE key = :key"), {"key": key}
+        )
     ).scalar_one_or_none()
 
 

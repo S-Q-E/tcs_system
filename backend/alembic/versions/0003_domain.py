@@ -23,19 +23,19 @@ def _ts(name: str, nullable: bool = False) -> sa.Column:
 
 def upgrade() -> None:
     op.create_table(
-        "crm_pipelines",
+        "tcs_crm_pipelines",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("name", sa.String(255), nullable=False, unique=True),
         sa.Column("is_default", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("sort", sa.Integer(), nullable=False, server_default="0"),
     )
     op.create_table(
-        "crm_stages",
+        "tcs_crm_stages",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column(
             "pipeline_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_pipelines.id", ondelete="CASCADE"),
+            sa.ForeignKey("tcs_crm_pipelines.id", ondelete="CASCADE"),
             nullable=False,
             index=True,
         ),
@@ -45,17 +45,17 @@ def upgrade() -> None:
         sa.Column("kind", sa.String(8), nullable=False, server_default="open"),
         sa.Column("bot_stage_key", sa.Text(), nullable=True, index=True),
         sa.Column("bot_status_key", sa.Text(), nullable=True),
-        sa.CheckConstraint("kind IN ('open', 'won', 'lost')", name="ck_crm_stages_kind"),
-        sa.UniqueConstraint("pipeline_id", "name", name="uq_crm_stages_pipeline_name"),
+        sa.CheckConstraint("kind IN ('open', 'won', 'lost')", name="ck_tcs_crm_stages_kind"),
+        sa.UniqueConstraint("pipeline_id", "name", name="uq_tcs_crm_stages_pipeline_name"),
     )
     op.create_table(
-        "crm_lost_reasons",
+        "tcs_crm_lost_reasons",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("name", sa.String(255), nullable=False, unique=True),
         sa.Column("sort", sa.Integer(), nullable=False, server_default="0"),
     )
     op.create_table(
-        "crm_contacts",
+        "tcs_crm_contacts",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("whatsapp_id", sa.Text(), nullable=True, unique=True, index=True),
         sa.Column("name", sa.String(255), nullable=True),
@@ -65,7 +65,7 @@ def upgrade() -> None:
         sa.Column(
             "owner_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_users.id", ondelete="SET NULL"),
+            sa.ForeignKey("tcs_crm_users.id", ondelete="SET NULL"),
             nullable=True,
             index=True,
         ),
@@ -75,26 +75,26 @@ def upgrade() -> None:
         _ts("deleted_at", nullable=True),
     )
     op.create_table(
-        "crm_deals",
+        "tcs_crm_deals",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column(
             "contact_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_contacts.id", ondelete="CASCADE"),
+            sa.ForeignKey("tcs_crm_contacts.id", ondelete="CASCADE"),
             nullable=False,
             index=True,
         ),
         sa.Column(
             "pipeline_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_pipelines.id"),
+            sa.ForeignKey("tcs_crm_pipelines.id"),
             nullable=False,
             index=True,
         ),
         sa.Column(
             "stage_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_stages.id"),
+            sa.ForeignKey("tcs_crm_stages.id"),
             nullable=False,
             index=True,
         ),
@@ -104,7 +104,7 @@ def upgrade() -> None:
         sa.Column(
             "owner_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_users.id", ondelete="SET NULL"),
+            sa.ForeignKey("tcs_crm_users.id", ondelete="SET NULL"),
             nullable=True,
             index=True,
         ),
@@ -112,7 +112,7 @@ def upgrade() -> None:
         sa.Column(
             "lost_reason_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_lost_reasons.id", ondelete="SET NULL"),
+            sa.ForeignKey("tcs_crm_lost_reasons.id", ondelete="SET NULL"),
             nullable=True,
         ),
         sa.Column("trial_at", sa.DateTime(timezone=True), nullable=True),
@@ -123,66 +123,66 @@ def upgrade() -> None:
         _ts("created_at"),
         _ts("updated_at"),
         _ts("deleted_at", nullable=True),
-        sa.CheckConstraint("status IN ('open', 'won', 'lost')", name="ck_crm_deals_status"),
+        sa.CheckConstraint("status IN ('open', 'won', 'lost')", name="ck_tcs_crm_deals_status"),
     )
     op.create_table(
-        "crm_deal_stage_history",
+        "tcs_crm_deal_stage_history",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column(
             "deal_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_deals.id", ondelete="CASCADE"),
+            sa.ForeignKey("tcs_crm_deals.id", ondelete="CASCADE"),
             nullable=False,
             index=True,
         ),
         sa.Column(
             "from_stage_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_stages.id", ondelete="SET NULL"),
+            sa.ForeignKey("tcs_crm_stages.id", ondelete="SET NULL"),
             nullable=True,
         ),
         sa.Column(
             "to_stage_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_stages.id", ondelete="SET NULL"),
+            sa.ForeignKey("tcs_crm_stages.id", ondelete="SET NULL"),
             nullable=True,
         ),
         sa.Column(
             "changed_by",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_users.id", ondelete="SET NULL"),
+            sa.ForeignKey("tcs_crm_users.id", ondelete="SET NULL"),
             nullable=True,
         ),
         sa.Column("source", sa.String(8), nullable=False),
         _ts("at"),
         sa.CheckConstraint(
             "source IN ('manager', 'bot', 'system')",
-            name="ck_crm_deal_stage_history_source",
+            name="ck_tcs_crm_deal_stage_history_source",
         ),
     )
     op.create_table(
-        "crm_tags",
+        "tcs_crm_tags",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("name", sa.String(64), nullable=False, unique=True),
         sa.Column("color", sa.String(16), nullable=True),
     )
     op.create_table(
-        "crm_entity_tags",
+        "tcs_crm_entity_tags",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column(
             "tag_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_tags.id", ondelete="CASCADE"),
+            sa.ForeignKey("tcs_crm_tags.id", ondelete="CASCADE"),
             nullable=False,
             index=True,
         ),
         sa.Column("entity", sa.String(8), nullable=False),
         sa.Column("entity_id", postgresql.UUID(as_uuid=True), nullable=False, index=True),
-        sa.CheckConstraint("entity IN ('contact', 'deal')", name="ck_crm_entity_tags_entity"),
-        sa.UniqueConstraint("tag_id", "entity", "entity_id", name="uq_crm_entity_tags_target"),
+        sa.CheckConstraint("entity IN ('contact', 'deal')", name="ck_tcs_crm_entity_tags_entity"),
+        sa.UniqueConstraint("tag_id", "entity", "entity_id", name="uq_tcs_crm_entity_tags_target"),
     )
     op.create_table(
-        "crm_custom_fields",
+        "tcs_crm_custom_fields",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("entity", sa.String(8), nullable=False),
         sa.Column("key", sa.String(64), nullable=False),
@@ -191,28 +191,28 @@ def upgrade() -> None:
         sa.Column("options", postgresql.JSONB(), nullable=True),
         sa.Column("required", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("sort", sa.Integer(), nullable=False, server_default="0"),
-        sa.CheckConstraint("entity IN ('contact', 'deal')", name="ck_crm_custom_fields_entity"),
+        sa.CheckConstraint("entity IN ('contact', 'deal')", name="ck_tcs_crm_custom_fields_entity"),
         sa.CheckConstraint(
             "type IN ('text', 'number', 'date', 'select', 'multiselect', 'bool')",
-            name="ck_crm_custom_fields_type",
+            name="ck_tcs_crm_custom_fields_type",
         ),
-        sa.UniqueConstraint("entity", "key", name="uq_crm_custom_fields_entity_key"),
+        sa.UniqueConstraint("entity", "key", name="uq_tcs_crm_custom_fields_entity_key"),
     )
     op.create_table(
-        "crm_conversation_state",
+        "tcs_crm_conversation_state",
         sa.Column("whatsapp_id", sa.Text(), primary_key=True),
         sa.Column("bot_paused", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column(
             "paused_by",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_users.id", ondelete="SET NULL"),
+            sa.ForeignKey("tcs_crm_users.id", ondelete="SET NULL"),
             nullable=True,
         ),
         sa.Column("paused_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "assigned_to",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_users.id", ondelete="SET NULL"),
+            sa.ForeignKey("tcs_crm_users.id", ondelete="SET NULL"),
             nullable=True,
             index=True,
         ),
@@ -220,17 +220,17 @@ def upgrade() -> None:
         sa.Column("last_read_at", sa.DateTime(timezone=True), nullable=True),
     )
     op.create_table(
-        "crm_settings",
+        "tcs_crm_settings",
         sa.Column("key", sa.Text(), primary_key=True),
         sa.Column("value", postgresql.JSONB(), nullable=False),
     )
     op.create_table(
-        "crm_activity_log",
+        "tcs_crm_activity_log",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column(
             "actor_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_users.id", ondelete="SET NULL"),
+            sa.ForeignKey("tcs_crm_users.id", ondelete="SET NULL"),
             nullable=True,
             index=True,
         ),
@@ -247,15 +247,15 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table("crm_activity_log")
-    op.drop_table("crm_settings")
-    op.drop_table("crm_conversation_state")
-    op.drop_table("crm_custom_fields")
-    op.drop_table("crm_entity_tags")
-    op.drop_table("crm_tags")
-    op.drop_table("crm_deal_stage_history")
-    op.drop_table("crm_deals")
-    op.drop_table("crm_contacts")
-    op.drop_table("crm_lost_reasons")
-    op.drop_table("crm_stages")
-    op.drop_table("crm_pipelines")
+    op.drop_table("tcs_crm_activity_log")
+    op.drop_table("tcs_crm_settings")
+    op.drop_table("tcs_crm_conversation_state")
+    op.drop_table("tcs_crm_custom_fields")
+    op.drop_table("tcs_crm_entity_tags")
+    op.drop_table("tcs_crm_tags")
+    op.drop_table("tcs_crm_deal_stage_history")
+    op.drop_table("tcs_crm_deals")
+    op.drop_table("tcs_crm_contacts")
+    op.drop_table("tcs_crm_lost_reasons")
+    op.drop_table("tcs_crm_stages")
+    op.drop_table("tcs_crm_pipelines")

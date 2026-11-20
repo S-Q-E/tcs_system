@@ -1,4 +1,4 @@
-"""Auth tables: crm_users + crm_sessions (step 2)."""
+"""Auth tables: tcs_crm_users + tcs_crm_sessions (step 2)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ depends_on = None
 
 def upgrade() -> None:
     op.create_table(
-        "crm_users",
+        "tcs_crm_users",
         sa.Column(
             "id",
             postgresql.UUID(as_uuid=True),
@@ -32,10 +32,10 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.func.now(),
         ),
-        sa.CheckConstraint("role IN ('admin', 'manager')", name="ck_crm_users_role"),
+        sa.CheckConstraint("role IN ('admin', 'manager')", name="ck_tcs_crm_users_role"),
     )
     op.create_table(
-        "crm_sessions",
+        "tcs_crm_sessions",
         sa.Column(
             "id",
             postgresql.UUID(as_uuid=True),
@@ -44,7 +44,7 @@ def upgrade() -> None:
         sa.Column(
             "user_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_users.id", ondelete="CASCADE"),
+            sa.ForeignKey("tcs_crm_users.id", ondelete="CASCADE"),
             nullable=False,
             index=True,
         ),
@@ -64,5 +64,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table("crm_sessions")
-    op.drop_table("crm_users")
+    op.drop_table("tcs_crm_sessions")
+    op.drop_table("tcs_crm_users")

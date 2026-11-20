@@ -12,10 +12,10 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute(
-        "CREATE INDEX ix_crm_conversation_state_last_message"
-        " ON crm_conversation_state (last_message_at DESC NULLS LAST, whatsapp_id)"
+        "CREATE INDEX ix_tcs_crm_conversation_state_last_message"
+        " ON tcs_crm_conversation_state (last_message_at DESC NULLS LAST, whatsapp_id)"
     )
 
 
 def downgrade() -> None:
-    op.execute("DROP INDEX ix_crm_conversation_state_last_message")
+    op.execute("DROP INDEX ix_tcs_crm_conversation_state_last_message")

@@ -73,7 +73,7 @@ async def test_pipeline_must_exist_and_match(conn):
     # The script never creates or renames pipeline rows; a missing or
     # different pipeline is an error.
     await conn.execute(
-        "UPDATE crm_pipelines SET name = 'Renamed' WHERE name = $1", seed.PIPELINE_NAME
+        "UPDATE tcs_crm_pipelines SET name = 'Renamed' WHERE name = $1", seed.PIPELINE_NAME
     )
     error = await seed.pipeline_error(conn)
     assert error is not None and "not found" in error
@@ -89,12 +89,12 @@ async def test_seed_idempotent_and_complete(conn):
     assert first["units"] == 14
 
     # The pipeline is the only one and has exactly six stages (from Alembic).
-    pipelines = await conn.fetch("SELECT name, is_default FROM crm_pipelines ORDER BY name")
+    pipelines = await conn.fetch("SELECT name, is_default FROM tcs_crm_pipelines ORDER BY name")
     assert [row["name"] for row in pipelines] == ["TCS Leasing"]
     assert pipelines[0]["is_default"] is True
     stages = await conn.fetch(
-        "SELECT name, kind, bot_stage_key, bot_status_key FROM crm_stages"
-        " WHERE pipeline_id = (SELECT id FROM crm_pipelines WHERE name = 'TCS Leasing')"
+        "SELECT name, kind, bot_stage_key, bot_status_key FROM tcs_crm_stages"
+        " WHERE pipeline_id = (SELECT id FROM tcs_crm_pipelines WHERE name = 'TCS Leasing')"
         " ORDER BY sort"
     )
     assert [row["name"] for row in stages] == [
@@ -112,7 +112,7 @@ async def test_seed_idempotent_and_complete(conn):
 
     # unanswered_after_minutes is a JSON number 2.
     raw = await conn.fetchval(
-        "SELECT value FROM crm_settings WHERE key = 'unanswered_after_minutes'"
+        "SELECT value FROM tcs_crm_settings WHERE key = 'unanswered_after_minutes'"
     )
     value = json.loads(raw) if isinstance(raw, str) else raw
     assert value == 2
@@ -259,7 +259,7 @@ async def test_no_truncate_and_demo_marker(conn):
     source = Path(seed.__file__).read_text(encoding="utf-8")
     assert "TRUNCATE TABLE" not in source
     raw = await conn.fetchval(
-        "SELECT value::text FROM crm_settings WHERE key = 'unanswered_after_minutes'"
+        "SELECT value::text FROM tcs_crm_settings WHERE key = 'unanswered_after_minutes'"
     )
     assert raw == "2"
     assert await conn.fetchval("SELECT 1") == 1  # connection still usable

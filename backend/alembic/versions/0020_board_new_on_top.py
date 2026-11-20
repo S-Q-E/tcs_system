@@ -25,16 +25,16 @@ def upgrade() -> None:
         sa.text(
             "WITH first_open AS ("
             " SELECT DISTINCT ON (pipeline_id) id AS stage_id, pipeline_id"
-            " FROM crm_stages WHERE kind = 'open' ORDER BY pipeline_id, sort, name"
+            " FROM tcs_crm_stages WHERE kind = 'open' ORDER BY pipeline_id, sort, name"
             "), ranked AS ("
             " SELECT d.id,"
             " ROW_NUMBER() OVER ("
             " PARTITION BY d.stage_id ORDER BY d.created_at DESC, d.id"
             " ) AS rn"
-            " FROM crm_deals d JOIN first_open f ON f.stage_id = d.stage_id"
+            " FROM tcs_crm_deals d JOIN first_open f ON f.stage_id = d.stage_id"
             " WHERE d.deleted_at IS NULL"
             ")"
-            " UPDATE crm_deals d SET position = r.rn FROM ranked r WHERE d.id = r.id"
+            " UPDATE tcs_crm_deals d SET position = r.rn FROM ranked r WHERE d.id = r.id"
         )
     )
 

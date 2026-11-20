@@ -29,7 +29,7 @@ async def _set_assignment(factory, mode: str) -> None:
     async with factory() as session:
         await session.execute(
             text(
-                "INSERT INTO crm_settings (key, value) VALUES"
+                "INSERT INTO tcs_crm_settings (key, value) VALUES"
                 " ('deal_assignment', CAST(:value AS jsonb))"
                 " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
             ),
@@ -40,7 +40,7 @@ async def _set_assignment(factory, mode: str) -> None:
 
 async def _clear_assignment(factory) -> None:
     async with factory() as session:
-        await session.execute(text("DELETE FROM crm_settings WHERE key = 'deal_assignment'"))
+        await session.execute(text("DELETE FROM tcs_crm_settings WHERE key = 'deal_assignment'"))
         await session.commit()
 
 
@@ -58,7 +58,7 @@ async def test_round_robin_rotates_managers(client, settings):
                 (
                     await session.execute(
                         text(
-                            "SELECT id::text FROM crm_users WHERE role = 'manager'"
+                            "SELECT id::text FROM tcs_crm_users WHERE role = 'manager'"
                             " AND is_active ORDER BY created_at, id"
                         )
                     )
@@ -109,14 +109,15 @@ async def test_unassigned_default_and_deal_assigned_notify(client, settings):
             note = (
                 await session.execute(
                     text(
-                        "SELECT type FROM crm_notifications n JOIN crm_users u ON u.id = n.user_id"
+                        "SELECT type FROM tcs_crm_notifications n"
+                        " JOIN tcs_crm_users u ON u.id = n.user_id"
                         " WHERE u.email = :email ORDER BY n.created_at DESC LIMIT 1"
                     ),
                     {"email": manager["email"]},
                 )
             ).scalar_one()
             assert note == "deal_assigned"
-            await session.execute(text("DELETE FROM crm_notifications"))
+            await session.execute(text("DELETE FROM tcs_crm_notifications"))
             await session.commit()
     finally:
         for automation_id in automation_ids:
@@ -157,7 +158,7 @@ async def test_overdue_and_due_soon_idempotent(client, settings):
         soon_at = datetime.now(UTC) + timedelta(hours=2)
         async with factory() as session:
             await session.execute(
-                text("UPDATE crm_tasks SET due_at = :due WHERE title = 'Due soon one'"),
+                text("UPDATE tcs_crm_tasks SET due_at = :due WHERE title = 'Due soon one'"),
                 {"due": soon_at},
             )
             await session.commit()
@@ -170,7 +171,7 @@ async def test_overdue_and_due_soon_idempotent(client, settings):
             mine = (
                 await session.execute(
                     text(
-                        "SELECT type, COUNT(*) FROM crm_notifications n JOIN crm_users u"
+                        "SELECT type, COUNT(*) FROM tcs_crm_notifications n JOIN tcs_crm_users u"
                         " ON u.id = n.user_id WHERE u.email = :email GROUP BY type"
                     ),
                     {"email": manager["email"]},
@@ -181,7 +182,8 @@ async def test_overdue_and_due_soon_idempotent(client, settings):
             assert mine.get("task_due_soon") == 1
             await session.execute(
                 text(
-                    "DELETE FROM crm_notifications WHERE user_id = (SELECT id FROM crm_users"
+                    "DELETE FROM tcs_crm_notifications"
+                    " WHERE user_id = (SELECT id FROM tcs_crm_users"
                     " WHERE email = :email)"
                 ),
                 {"email": manager["email"]},
@@ -258,7 +260,8 @@ async def test_automations_crud_and_fire_once(client, settings, app):
             task_titles = (
                 (
                     await session.execute(
-                        text("SELECT title FROM crm_tasks WHERE deal_id = :id"), {"id": deal["id"]}
+                        text("SELECT title FROM tcs_crm_tasks WHERE deal_id = :id"),
+                        {"id": deal["id"]},
                     )
                 )
                 .scalars()
@@ -268,7 +271,7 @@ async def test_automations_crud_and_fire_once(client, settings, app):
             fired_marks = (
                 await session.execute(
                     text(
-                        "SELECT COUNT(*) FROM crm_activity_log WHERE entity = 'deal'"
+                        "SELECT COUNT(*) FROM tcs_crm_activity_log WHERE entity = 'deal'"
                         " AND entity_id = :id AND action = 'automation_fired'"
                     ),
                     {"id": deal["id"]},
@@ -362,7 +365,7 @@ async def test_no_activity_automation(client, settings):
         stale = datetime.now(UTC) - timedelta(hours=5)
         async with factory() as session:
             await session.execute(
-                text("UPDATE crm_deals SET updated_at = :at WHERE id = :id"),
+                text("UPDATE tcs_crm_deals SET updated_at = :at WHERE id = :id"),
                 {"at": stale, "id": deal["id"]},
             )
             await session.commit()

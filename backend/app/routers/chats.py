@@ -37,7 +37,7 @@ async def _autopause_enabled(session: AsyncSession) -> bool:
     """Manager send auto-pauses the bot unless explicitly disabled (default true)."""
     value = (
         await session.execute(
-            text("SELECT value FROM crm_settings WHERE key = :key"),
+            text("SELECT value FROM tcs_crm_settings WHERE key = :key"),
             {"key": SETTING_AUTOPAUSE_ON_MANUAL_REPLY},
         )
     ).scalar_one_or_none()

@@ -15,7 +15,7 @@ from ..services.unanswered import notify_unanswered
 
 logger = logging.getLogger(__name__)
 
-NOTIFY_LOCK_KEY = 91030002
+NOTIFY_LOCK_KEY = 92030002
 NOTIFY_INTERVAL_SECONDS = 60
 
 

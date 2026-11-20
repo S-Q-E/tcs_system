@@ -10,12 +10,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 def test_version_table_name():
-    assert VERSION_TABLE == "crm_alembic_version"
+    assert VERSION_TABLE == "tcs_crm_alembic_version"
 
 
 def test_include_object_allows_crm_tables():
-    assert include_object(None, "crm_users", "table", False, None) is True
-    assert include_object(None, "crm_alembic_version", "table", False, None) is True
+    assert include_object(None, "tcs_crm_users", "table", False, None) is True
+    assert include_object(None, "tcs_crm_alembic_version", "table", False, None) is True
 
 
 def test_include_object_blocks_bot_and_foreign_tables():
@@ -27,9 +27,9 @@ def test_include_object_blocks_bot_and_foreign_tables():
 
 
 def test_include_object_indexes_follow_parent_table():
-    crm_index = SimpleNamespace(table=SimpleNamespace(name="crm_deals"))
+    crm_index = SimpleNamespace(table=SimpleNamespace(name="tcs_crm_deals"))
     bot_index = SimpleNamespace(table=SimpleNamespace(name="tcs_messages"))
-    assert include_object(crm_index, "ix_crm_deals_x", "index", True, None) is True
+    assert include_object(crm_index, "ix_tcs_crm_deals_x", "index", True, None) is True
     assert include_object(bot_index, "idx_messages_x", "index", True, None) is False
 
 

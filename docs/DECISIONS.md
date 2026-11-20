@@ -5,7 +5,7 @@ code comments reference them.
 
 ## D1. Sessions, not JWT
 
-Opaque random session tokens in `crm_sessions`, stored as SHA-256 hashes, sent
+Opaque random session tokens in `tcs_crm_sessions`, stored as SHA-256 hashes, sent
 in an HttpOnly cookie; CSRF is a double-submit token for unsafe methods.
 14-day sliding TTL.
 
@@ -30,11 +30,11 @@ and fans out on a process-local event bus; SSE clients consume it at
 
 Settings control pausing the bot on handover (`auto_pause_on_manager`) and on a
 manual manager reply (`auto_pause_on_manual_reply`). The pause flag lives in
-`crm_conversation_state` and the bot checks it before replying.
+`tcs_crm_conversation_state` and the bot checks it before replying.
 
 ## D6. Manager outbound messages go through outbox + n8n webhook
 
-The CRM stores no provider keys. A manager message is queued in `crm_outbox`;
+The CRM stores no provider keys. A manager message is queued in `tcs_crm_outbox`;
 the outbox worker POSTs `{outbox_id, whatsapp_id, text}` with `X-CRM-Secret` to
 `N8N_SEND_WEBHOOK_URL`; n8n sends via Telegram and dedupes on `outbox_id`.
 A mirrored row is written to `tcs_messages` by `bot_bridge.py`.
@@ -99,7 +99,7 @@ notification delivery is deduplicated per user and entity.
 
 ## D16. Step 10 realtime notes
 
-SSE with heartbeats; the poller keeps cursors in `crm_settings` and overlaps
+SSE with heartbeats; the poller keeps cursors in `tcs_crm_settings` and overlaps
 windows to avoid gaps; events are deduplicated by id; the client falls back to
 polling when the stream is unavailable.
 

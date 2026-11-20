@@ -21,7 +21,7 @@ MODE_ROUND_ROBIN = "round_robin"
 async def get_assignment_mode(session: AsyncSession) -> str:
     row = (
         await session.execute(
-            text("SELECT value FROM crm_settings WHERE key = :key"), {"key": SETTING_ASSIGNMENT}
+            text("SELECT value FROM tcs_crm_settings WHERE key = :key"), {"key": SETTING_ASSIGNMENT}
         )
     ).scalar_one_or_none()
     if isinstance(row, dict) and row.get("mode") == MODE_ROUND_ROBIN:
@@ -38,7 +38,7 @@ async def pick_assignee(session: AsyncSession) -> uuid.UUID | None:
     """
     row = (
         await session.execute(
-            text("SELECT value FROM crm_settings WHERE key = :key FOR UPDATE"),
+            text("SELECT value FROM tcs_crm_settings WHERE key = :key FOR UPDATE"),
             {"key": SETTING_ASSIGNMENT},
         )
     ).scalar_one_or_none()
@@ -55,7 +55,7 @@ async def pick_assignee(session: AsyncSession) -> uuid.UUID | None:
     picked = managers[next_index][0]
     await session.execute(
         text(
-            "INSERT INTO crm_settings (key, value) VALUES (:key, CAST(:value AS jsonb))"
+            "INSERT INTO tcs_crm_settings (key, value) VALUES (:key, CAST(:value AS jsonb))"
             " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
         ),
         {
@@ -70,12 +70,12 @@ async def pick_assignee(session: AsyncSession) -> uuid.UUID | None:
 async def _sync_state(
     session: AsyncSession, whatsapp_id: str | None, owner_id: uuid.UUID | None
 ) -> None:
-    """Write the owner into crm_conversation_state (bot leads only)."""
+    """Write the owner into tcs_crm_conversation_state (bot leads only)."""
     if not whatsapp_id:
         return
     await session.execute(
         text(
-            "INSERT INTO crm_conversation_state (whatsapp_id, assigned_to)"
+            "INSERT INTO tcs_crm_conversation_state (whatsapp_id, assigned_to)"
             " SELECT :wa, CAST(:owner AS uuid)"
             " WHERE EXISTS (SELECT 1 FROM tcs_leads WHERE whatsapp_id = :wa)"
             " ON CONFLICT (whatsapp_id) DO UPDATE SET assigned_to = EXCLUDED.assigned_to"

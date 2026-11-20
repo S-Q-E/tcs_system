@@ -51,7 +51,7 @@ DATABASE_URL="$RAILWAY_DB" python scripts/seed_tcs_demo.py
 
 # 3) n8n dedupe table for CRM → Telegram sends (SQL from docs/n8n/README.md,
 #    'Dedupe table' section)
-psql "$RAILWAY_DB" -c "CREATE TABLE IF NOT EXISTS n8n_processed_outbox (
+psql "$RAILWAY_DB" -c "CREATE TABLE IF NOT EXISTS tcs_n8n_processed_outbox (
   outbox_id uuid PRIMARY KEY,
   provider_message_id text,
   created_at timestamptz NOT NULL DEFAULT now()
@@ -60,7 +60,7 @@ psql "$RAILWAY_DB" -c "CREATE TABLE IF NOT EXISTS n8n_processed_outbox (
 # 5) sanity checks
 psql "$RAILWAY_DB" -c "SELECT count(*) AS demo_leads FROM tcs_leads WHERE source='demo';"
 psql "$RAILWAY_DB" -c "SELECT count(*) AS units FROM tcs_units;"
-psql "$RAILWAY_DB" -c "SELECT name, is_default FROM crm_pipelines ORDER BY name;"
+psql "$RAILWAY_DB" -c "SELECT name, is_default FROM tcs_crm_pipelines ORDER BY name;"
 ```
 
 Expected: 30 demo leads, 14 units, `TCS Leasing` is the only default pipeline.
@@ -172,6 +172,6 @@ Wait 15 seconds (sync worker), then follow `DEMO_SCRIPT.md` → «Before the dem
 |---|---|
 | Login loops back to `/login` | `COOKIE_SECURE=true` over plain HTTP; use the generated HTTPS domain or set `false` locally. |
 | 401 on every n8n webhook call | `N8N_WEBHOOK_SECRET` differs between the CRM and n8n env. |
-| Bot silent | Workflow inactive, Telegram credential wrong, or the dialog is paused (`crm_conversation_state.bot_paused`). |
+| Bot silent | Workflow inactive, Telegram credential wrong, or the dialog is paused (`tcs_crm_conversation_state.bot_paused`). |
 | No deals after seeding | `SYNC_ENABLED=false` or the service cannot reach the DB; check logs and `/api/ready`. |
 | CRM send never arrives | W-A inactive, `N8N_SEND_WEBHOOK_URL` wrong, or n8n cannot reach the CRM URL from inside Railway. |

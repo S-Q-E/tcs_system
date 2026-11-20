@@ -140,8 +140,8 @@ def test_migration_lock_key_is_unique_and_used():
     # so the constant is asserted from source, never imported.
     match = re.search(r"MIGRATION_LOCK_KEY\s*=\s*(\d+)", source)
     assert match, "env.py must define MIGRATION_LOCK_KEY"
-    assert int(match.group(1)) == 91030000
-    for taken in ("91030001", "91030002", "91030003"):  # sync/notify/outbox workers
+    assert int(match.group(1)) == 92030000
+    for taken in ("92030001", "92030002", "92030003"):  # sync/notify/outbox workers
         assert taken not in match.group(0)
     assert "pg_advisory_lock" in source
     assert "pg_advisory_unlock" in source

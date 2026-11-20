@@ -24,13 +24,13 @@ VALID_IMPORT_STATUSES = (
 class CrmImport(Base):
     """Background CSV import job with per-row error report."""
 
-    __tablename__ = "crm_imports"
+    __tablename__ = "tcs_crm_imports"
     __table_args__ = (
         CheckConstraint(
             "status IN ('queued', 'running', 'done', 'failed')",
-            name="ck_crm_imports_status",
+            name="ck_tcs_crm_imports_status",
         ),
-        CheckConstraint("entity IN ('contact', 'deal')", name="ck_crm_imports_entity"),
+        CheckConstraint("entity IN ('contact', 'deal')", name="ck_tcs_crm_imports_entity"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -43,7 +43,7 @@ class CrmImport(Base):
     errors: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]")
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("crm_users.id", ondelete="SET NULL"),
+        ForeignKey("tcs_crm_users.id", ondelete="SET NULL"),
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(

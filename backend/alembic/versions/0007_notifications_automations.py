@@ -14,12 +14,12 @@ depends_on = None
 
 def upgrade() -> None:
     op.create_table(
-        "crm_notifications",
+        "tcs_crm_notifications",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column(
             "user_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_users.id", ondelete="CASCADE"),
+            sa.ForeignKey("tcs_crm_users.id", ondelete="CASCADE"),
             nullable=False,
             index=True,
         ),
@@ -33,9 +33,11 @@ def upgrade() -> None:
             server_default=sa.func.now(),
         ),
     )
-    op.create_index("ix_crm_notifications_user_read", "crm_notifications", ["user_id", "read_at"])
+    op.create_index(
+        "ix_tcs_crm_notifications_user_read", "tcs_crm_notifications", ["user_id", "read_at"]
+    )
     op.create_table(
-        "crm_automations",
+        "tcs_crm_automations",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("name", sa.String(255), nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
@@ -50,12 +52,12 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint(
             "trigger_type IN ('deal_entered_stage', 'no_activity_hours')",
-            name="ck_crm_automations_trigger",
+            name="ck_tcs_crm_automations_trigger",
         ),
     )
 
 
 def downgrade() -> None:
-    op.drop_table("crm_automations")
-    op.drop_index("ix_crm_notifications_user_read", table_name="crm_notifications")
-    op.drop_table("crm_notifications")
+    op.drop_table("tcs_crm_automations")
+    op.drop_index("ix_tcs_crm_notifications_user_read", table_name="tcs_crm_notifications")
+    op.drop_table("tcs_crm_notifications")

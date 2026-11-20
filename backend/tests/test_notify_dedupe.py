@@ -68,7 +68,7 @@ async def test_concurrent_notify_dedupes_to_one_row(client, settings):
             count = (
                 await session.execute(
                     text(
-                        "SELECT COUNT(*) FROM crm_notifications"
+                        "SELECT COUNT(*) FROM tcs_crm_notifications"
                         " WHERE user_id = :uid AND type = 'task_overdue'"
                         " AND dedupe_key = :key AND read_at IS NULL"
                     ),
@@ -77,7 +77,7 @@ async def test_concurrent_notify_dedupes_to_one_row(client, settings):
             ).scalar()
             assert count == 1
             await session.execute(
-                text("DELETE FROM crm_notifications WHERE dedupe_key = :key"), {"key": key}
+                text("DELETE FROM tcs_crm_notifications WHERE dedupe_key = :key"), {"key": key}
             )
             await session.commit()
     finally:

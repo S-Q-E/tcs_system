@@ -153,7 +153,7 @@ class RealtimePoller:
         async with self._factory() as session:
             await session.execute(
                 text(
-                    "UPDATE crm_conversation_state AS s"
+                    "UPDATE tcs_crm_conversation_state AS s"
                     " SET last_message_at = m.created_at,"
                     "     last_message_direction = m.direction,"
                     "     last_message_preview = LEFT(m.content, 200)"
@@ -207,7 +207,7 @@ def _replay_start(stored: dict[str, Any] | None, key: str, table_max: int) -> in
 async def _load_cursors(session: AsyncSession) -> dict[str, Any] | None:
     value = (
         await session.execute(
-            text("SELECT value FROM crm_settings WHERE key = :key"), {"key": CURSOR_SETTING}
+            text("SELECT value FROM tcs_crm_settings WHERE key = :key"), {"key": CURSOR_SETTING}
         )
     ).scalar_one_or_none()
     if isinstance(value, str):
@@ -221,7 +221,7 @@ async def _load_cursors(session: AsyncSession) -> dict[str, Any] | None:
 async def _store_cursors(session: AsyncSession, cursors: dict[str, int]) -> None:
     await session.execute(
         text(
-            "INSERT INTO crm_settings (key, value) VALUES (:key, CAST(:value AS jsonb))"
+            "INSERT INTO tcs_crm_settings (key, value) VALUES (:key, CAST(:value AS jsonb))"
             " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
         ),
         {"key": CURSOR_SETTING, "value": json.dumps(cursors)},

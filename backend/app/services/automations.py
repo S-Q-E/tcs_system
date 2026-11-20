@@ -115,7 +115,7 @@ async def _already_fired(
     row = (
         await session.execute(
             text(
-                "SELECT id FROM crm_activity_log WHERE entity = 'deal' AND entity_id = :deal"
+                "SELECT id FROM tcs_crm_activity_log WHERE entity = 'deal' AND entity_id = :deal"
                 " AND action = :action AND diff->>'automation_id' = :automation LIMIT 1"
             ),
             {"deal": deal_id, "action": AUTOMATION_FIRED_ACTION, "automation": str(automation_id)},

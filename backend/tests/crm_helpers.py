@@ -114,7 +114,7 @@ async def assert_logged(factory, entity: str, entity_id: str, action: str) -> No
             (
                 await session.execute(
                     text(
-                        "SELECT diff FROM crm_activity_log"
+                        "SELECT diff FROM tcs_crm_activity_log"
                         " WHERE entity = :entity AND entity_id = :id AND action = :action"
                         " ORDER BY created_at DESC LIMIT 1"
                     ),
@@ -134,7 +134,7 @@ async def purge_contacts(factory, contact_ids: list[str]) -> None:
         deals = (
             (
                 await session.execute(
-                    text("SELECT id FROM crm_deals WHERE contact_id = ANY(:ids)"),
+                    text("SELECT id FROM tcs_crm_deals WHERE contact_id = ANY(:ids)"),
                     {"ids": contact_ids},
                 )
             )
@@ -143,36 +143,38 @@ async def purge_contacts(factory, contact_ids: list[str]) -> None:
         )
         for deal_id in deals:
             await session.execute(
-                text("DELETE FROM crm_deal_stage_history WHERE deal_id = :id"), {"id": deal_id}
+                text("DELETE FROM tcs_crm_deal_stage_history WHERE deal_id = :id"), {"id": deal_id}
             )
             await session.execute(
-                text("DELETE FROM crm_activity_log WHERE entity_id = :id"), {"id": deal_id}
+                text("DELETE FROM tcs_crm_activity_log WHERE entity_id = :id"), {"id": deal_id}
             )
             await session.execute(
-                text("DELETE FROM crm_entity_tags WHERE entity = 'deal' AND entity_id = :id"),
+                text("DELETE FROM tcs_crm_entity_tags WHERE entity = 'deal' AND entity_id = :id"),
                 {"id": deal_id},
             )
             await session.execute(
-                text("DELETE FROM crm_notes WHERE deal_id = :id"), {"id": deal_id}
+                text("DELETE FROM tcs_crm_notes WHERE deal_id = :id"), {"id": deal_id}
             )
         await session.execute(
-            text("DELETE FROM crm_deals WHERE contact_id = ANY(:ids)"), {"ids": contact_ids}
+            text("DELETE FROM tcs_crm_deals WHERE contact_id = ANY(:ids)"), {"ids": contact_ids}
         )
         for contact_id in contact_ids:
             await session.execute(
-                text("DELETE FROM crm_activity_log WHERE entity_id = :id"), {"id": contact_id}
+                text("DELETE FROM tcs_crm_activity_log WHERE entity_id = :id"), {"id": contact_id}
             )
             await session.execute(
-                text("DELETE FROM crm_entity_tags WHERE entity = 'contact' AND entity_id = :id"),
+                text(
+                    "DELETE FROM tcs_crm_entity_tags WHERE entity = 'contact' AND entity_id = :id"
+                ),
                 {"id": contact_id},
             )
             await session.execute(
-                text("DELETE FROM crm_notes WHERE contact_id = :id"), {"id": contact_id}
+                text("DELETE FROM tcs_crm_notes WHERE contact_id = :id"), {"id": contact_id}
             )
         telegrams = (
             (
                 await session.execute(
-                    text("SELECT whatsapp_id FROM crm_contacts WHERE id = ANY(:ids)"),
+                    text("SELECT whatsapp_id FROM tcs_crm_contacts WHERE id = ANY(:ids)"),
                     {"ids": contact_ids},
                 )
             )
@@ -180,12 +182,13 @@ async def purge_contacts(factory, contact_ids: list[str]) -> None:
             .all()
         )
         await session.execute(
-            text("DELETE FROM crm_contacts WHERE id = ANY(:ids)"), {"ids": contact_ids}
+            text("DELETE FROM tcs_crm_contacts WHERE id = ANY(:ids)"), {"ids": contact_ids}
         )
         for wa in telegrams:
             if wa:
                 await session.execute(
-                    text("DELETE FROM crm_conversation_state WHERE whatsapp_id = :wa"), {"wa": wa}
+                    text("DELETE FROM tcs_crm_conversation_state WHERE whatsapp_id = :wa"),
+                    {"wa": wa},
                 )
                 await session.execute(
                     text("DELETE FROM tcs_messages WHERE whatsapp_id = :wa"), {"wa": wa}
@@ -204,10 +207,10 @@ async def purge_pipelines(factory, pipeline_ids: list[str]) -> None:
         return
     async with factory() as session:
         await session.execute(
-            text("DELETE FROM crm_stages WHERE pipeline_id = ANY(:ids)"), {"ids": pipeline_ids}
+            text("DELETE FROM tcs_crm_stages WHERE pipeline_id = ANY(:ids)"), {"ids": pipeline_ids}
         )
         await session.execute(
-            text("DELETE FROM crm_pipelines WHERE id = ANY(:ids)"), {"ids": pipeline_ids}
+            text("DELETE FROM tcs_crm_pipelines WHERE id = ANY(:ids)"), {"ids": pipeline_ids}
         )
         await session.commit()
 

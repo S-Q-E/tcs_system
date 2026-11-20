@@ -38,16 +38,18 @@ async def _purge_lead(factory, wa: str) -> None:
         contacts = (
             (
                 await session.execute(
-                    text("SELECT id FROM crm_contacts WHERE whatsapp_id = :wa"), {"wa": wa}
+                    text("SELECT id FROM tcs_crm_contacts WHERE whatsapp_id = :wa"), {"wa": wa}
                 )
             )
             .scalars()
             .all()
         )
         await session.execute(
-            text("DELETE FROM crm_conversation_state WHERE whatsapp_id = :wa"), {"wa": wa}
+            text("DELETE FROM tcs_crm_conversation_state WHERE whatsapp_id = :wa"), {"wa": wa}
         )
-        await session.execute(text("DELETE FROM crm_outbox WHERE whatsapp_id = :wa"), {"wa": wa})
+        await session.execute(
+            text("DELETE FROM tcs_crm_outbox WHERE whatsapp_id = :wa"), {"wa": wa}
+        )
         await session.execute(text("DELETE FROM tcs_messages WHERE whatsapp_id = :wa"), {"wa": wa})
         await session.execute(text("DELETE FROM tcs_events WHERE whatsapp_id = :wa"), {"wa": wa})
         await session.execute(text("DELETE FROM tcs_leads WHERE whatsapp_id = :wa"), {"wa": wa})
@@ -62,7 +64,7 @@ async def _notifications(factory, email: str) -> list[dict]:
                 await session.execute(
                     text(
                         "SELECT n.type, n.read_at IS NOT NULL AS read, n.payload"
-                        " FROM crm_notifications n JOIN crm_users u ON u.id = n.user_id"
+                        " FROM tcs_crm_notifications n JOIN tcs_crm_users u ON u.id = n.user_id"
                         " WHERE u.email = :email ORDER BY n.created_at"
                     ),
                     {"email": email},
@@ -86,19 +88,19 @@ async def test_handover_notifies_without_task(client, settings):
         async with factory() as session:
             contact_id = (
                 await session.execute(
-                    text("SELECT id FROM crm_contacts WHERE whatsapp_id = :wa"), {"wa": wa}
+                    text("SELECT id FROM tcs_crm_contacts WHERE whatsapp_id = :wa"), {"wa": wa}
                 )
             ).scalar_one()
             deal_id = (
                 await session.execute(
-                    text("SELECT id FROM crm_deals WHERE contact_id = :id"), {"id": contact_id}
+                    text("SELECT id FROM tcs_crm_deals WHERE contact_id = :id"), {"id": contact_id}
                 )
             ).scalar_one()
             await session.execute(
-                text("DELETE FROM crm_tasks WHERE deal_id = :id"), {"id": deal_id}
+                text("DELETE FROM tcs_crm_tasks WHERE deal_id = :id"), {"id": deal_id}
             )
             await session.execute(
-                text("UPDATE crm_deals SET owner_id = :owner WHERE id = :id"),
+                text("UPDATE tcs_crm_deals SET owner_id = :owner WHERE id = :id"),
                 {"owner": owner["user"]["id"], "id": deal_id},
             )
             await session.commit()
@@ -109,7 +111,7 @@ async def test_handover_notifies_without_task(client, settings):
                 (
                     await session.execute(
                         text(
-                            "SELECT title, assignee_id FROM crm_tasks WHERE deal_id = :id"
+                            "SELECT title, assignee_id FROM tcs_crm_tasks WHERE deal_id = :id"
                             " AND done_at IS NULL"
                         ),
                         {"id": deal_id},
@@ -121,7 +123,9 @@ async def test_handover_notifies_without_task(client, settings):
             assert tasks == []
             paused = (
                 await session.execute(
-                    text("SELECT bot_paused FROM crm_conversation_state WHERE whatsapp_id = :wa"),
+                    text(
+                        "SELECT bot_paused FROM tcs_crm_conversation_state WHERE whatsapp_id = :wa"
+                    ),
                     {"wa": wa},
                 )
             ).scalar()
@@ -141,7 +145,7 @@ async def test_handover_notifies_without_task(client, settings):
         async with factory() as session:
             count = (
                 await session.execute(
-                    text("SELECT COUNT(*) FROM crm_tasks WHERE deal_id = :id"), {"id": deal_id}
+                    text("SELECT COUNT(*) FROM tcs_crm_tasks WHERE deal_id = :id"), {"id": deal_id}
                 )
             ).scalar()
             assert count == 0
@@ -163,7 +167,8 @@ async def _deal_id(factory, wa: str):
         return (
             await session.execute(
                 text(
-                    "SELECT d.id FROM crm_deals d JOIN crm_contacts c ON c.id = d.contact_id"
+                    "SELECT d.id FROM tcs_crm_deals d"
+                    " JOIN tcs_crm_contacts c ON c.id = d.contact_id"
                     " WHERE c.whatsapp_id = :wa"
                 ),
                 {"wa": wa},
@@ -184,11 +189,12 @@ async def test_handover_once_per_deal_after_task_done_and_read(client, settings)
         deal_id = await _deal_id(factory, wa)
         async with factory() as session:
             await session.execute(
-                text("UPDATE crm_tasks SET done_at = now() WHERE deal_id = :id"), {"id": deal_id}
+                text("UPDATE tcs_crm_tasks SET done_at = now() WHERE deal_id = :id"),
+                {"id": deal_id},
             )
             await session.execute(
                 text(
-                    "UPDATE crm_notifications SET read_at = now()"
+                    "UPDATE tcs_crm_notifications SET read_at = now()"
                     " WHERE type = 'manager_handover' AND payload->>'deal_id' = :id"
                 ),
                 {"id": str(deal_id)},
@@ -201,14 +207,14 @@ async def test_handover_once_per_deal_after_task_done_and_read(client, settings)
         async with factory() as session:
             task_count = (
                 await session.execute(
-                    text("SELECT COUNT(*) FROM crm_tasks WHERE deal_id = :id"), {"id": deal_id}
+                    text("SELECT COUNT(*) FROM tcs_crm_tasks WHERE deal_id = :id"), {"id": deal_id}
                 )
             ).scalar_one()
             per_user = (
                 (
                     await session.execute(
                         text(
-                            "SELECT user_id, COUNT(*) AS n FROM crm_notifications"
+                            "SELECT user_id, COUNT(*) AS n FROM tcs_crm_notifications"
                             " WHERE type = 'manager_handover' AND payload->>'deal_id' = :id"
                             " GROUP BY user_id"
                         ),
@@ -235,7 +241,7 @@ async def test_autopause_opt_in(client, settings):
         async with factory() as session:
             await session.execute(
                 text(
-                    "INSERT INTO crm_settings (key, value) VALUES"
+                    "INSERT INTO tcs_crm_settings (key, value) VALUES"
                     " ('auto_pause_on_manager', 'true')"
                     " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
                 )
@@ -247,7 +253,8 @@ async def test_autopause_opt_in(client, settings):
                 paused = (
                     await session.execute(
                         text(
-                            "SELECT bot_paused FROM crm_conversation_state WHERE whatsapp_id = :wa"
+                            "SELECT bot_paused FROM tcs_crm_conversation_state"
+                            " WHERE whatsapp_id = :wa"
                         ),
                         {"wa": wa},
                     )
@@ -256,7 +263,7 @@ async def test_autopause_opt_in(client, settings):
         finally:
             async with factory() as session:
                 await session.execute(
-                    text("DELETE FROM crm_settings WHERE key = 'auto_pause_on_manager'")
+                    text("DELETE FROM tcs_crm_settings WHERE key = 'auto_pause_on_manager'")
                 )
                 await session.commit()
     finally:
@@ -276,14 +283,17 @@ async def test_locked_stage_notifies_owner(client, settings):
             deal_id = (
                 await session.execute(
                     text(
-                        "SELECT d.id FROM crm_deals d JOIN crm_contacts c ON c.id = d.contact_id"
+                        "SELECT d.id FROM tcs_crm_deals d"
+                        " JOIN tcs_crm_contacts c ON c.id = d.contact_id"
                         " WHERE c.whatsapp_id = :wa"
                     ),
                     {"wa": wa},
                 )
             ).scalar_one()
             await session.execute(
-                text("UPDATE crm_deals SET stage_locked = TRUE, owner_id = :owner WHERE id = :id"),
+                text(
+                    "UPDATE tcs_crm_deals SET stage_locked = TRUE, owner_id = :owner WHERE id = :id"
+                ),
                 {"owner": owner["user"]["id"], "id": deal_id},
             )
             await session.execute(
@@ -344,7 +354,7 @@ async def test_notification_endpoints(client, settings, app):
             assert missing.status_code == 404
         finally:
             async with factory() as session:
-                await session.execute(text("DELETE FROM crm_notifications"))
+                await session.execute(text("DELETE FROM tcs_crm_notifications"))
                 await session.commit()
             await engine.dispose()
 
@@ -362,7 +372,7 @@ async def test_overdue_reminder_not_recreated_after_read(client, settings):
         async with factory() as session:
             await session.execute(
                 text(
-                    "INSERT INTO crm_tasks (id, title, type, due_at, assignee_id)"
+                    "INSERT INTO tcs_crm_tasks (id, title, type, due_at, assignee_id)"
                     " VALUES (:id, 'B05 overdue', 'message', :due, :assignee)"
                 ),
                 {
@@ -377,7 +387,7 @@ async def test_overdue_reminder_not_recreated_after_read(client, settings):
         async with factory() as session:
             await session.execute(
                 text(
-                    "UPDATE crm_notifications SET read_at = now()"
+                    "UPDATE tcs_crm_notifications SET read_at = now()"
                     " WHERE type = 'task_overdue' AND payload->>'task_id' = :id"
                 ),
                 {"id": task_id},
@@ -390,7 +400,7 @@ async def test_overdue_reminder_not_recreated_after_read(client, settings):
             count = (
                 await session.execute(
                     text(
-                        "SELECT COUNT(*) FROM crm_notifications"
+                        "SELECT COUNT(*) FROM tcs_crm_notifications"
                         " WHERE type = 'task_overdue' AND payload->>'task_id' = :id"
                     ),
                     {"id": task_id},
@@ -400,10 +410,10 @@ async def test_overdue_reminder_not_recreated_after_read(client, settings):
     finally:
         async with factory() as session:
             await session.execute(
-                text("DELETE FROM crm_notifications WHERE payload->>'task_id' = :id"),
+                text("DELETE FROM tcs_crm_notifications WHERE payload->>'task_id' = :id"),
                 {"id": task_id},
             )
-            await session.execute(text("DELETE FROM crm_tasks WHERE id = :id"), {"id": task_id})
+            await session.execute(text("DELETE FROM tcs_crm_tasks WHERE id = :id"), {"id": task_id})
             await session.commit()
         await engine.dispose()
 
@@ -420,7 +430,7 @@ async def test_bot_stage_blocked_logged_once_per_target(client, settings):
         deal_id = await _deal_id(factory, wa)
         async with factory() as session:
             await session.execute(
-                text("UPDATE crm_deals SET stage_locked = TRUE WHERE id = :id"), {"id": deal_id}
+                text("UPDATE tcs_crm_deals SET stage_locked = TRUE WHERE id = :id"), {"id": deal_id}
             )
             await session.execute(
                 text(
@@ -436,7 +446,7 @@ async def test_bot_stage_blocked_logged_once_per_target(client, settings):
             count = (
                 await session.execute(
                     text(
-                        "SELECT COUNT(*) FROM crm_activity_log"
+                        "SELECT COUNT(*) FROM tcs_crm_activity_log"
                         " WHERE entity = 'deal' AND entity_id = :id"
                         " AND action = 'bot_stage_blocked'"
                     ),

@@ -85,13 +85,15 @@ async def _purge_lead(factory, wa: str) -> None:
         contacts = (
             (
                 await session.execute(
-                    text("SELECT id FROM crm_contacts WHERE whatsapp_id = :wa"), {"wa": wa}
+                    text("SELECT id FROM tcs_crm_contacts WHERE whatsapp_id = :wa"), {"wa": wa}
                 )
             )
             .scalars()
             .all()
         )
-        await session.execute(text("DELETE FROM crm_outbox WHERE whatsapp_id = :wa"), {"wa": wa})
+        await session.execute(
+            text("DELETE FROM tcs_crm_outbox WHERE whatsapp_id = :wa"), {"wa": wa}
+        )
         await session.execute(text("DELETE FROM tcs_messages WHERE whatsapp_id = :wa"), {"wa": wa})
         await session.execute(text("DELETE FROM tcs_events WHERE whatsapp_id = :wa"), {"wa": wa})
         await session.execute(text("DELETE FROM tcs_leads WHERE whatsapp_id = :wa"), {"wa": wa})
@@ -290,7 +292,7 @@ async def test_stream_delivers_notifications_only_to_owner(app, settings, clean_
                 await _wait_for_subscribers(0)
     finally:
         async with factory() as session:
-            await session.execute(text("DELETE FROM crm_notifications"))
+            await session.execute(text("DELETE FROM tcs_crm_notifications"))
             await session.commit()
         await engine.dispose()
 
@@ -428,7 +430,7 @@ async def test_task_create_publishes_task_created(client, settings, clean_bus):
                 assert len(task_events) == 1
                 assert task_events[0]["data"]["task_id"] == created.json()["id"]
             finally:
-                await purge_rows(factory, "crm_tasks", [created.json()["id"]])
+                await purge_rows(factory, "tcs_crm_tasks", [created.json()["id"]])
         finally:
             clean_bus.unsubscribe(queue)
     finally:
@@ -539,7 +541,7 @@ async def test_stream_hides_foreign_bot_events_when_scoped(app, settings, clean_
                 async with factory() as session:
                     await session.execute(
                         text(
-                            "INSERT INTO crm_settings (key, value) VALUES"
+                            "INSERT INTO tcs_crm_settings (key, value) VALUES"
                             " ('restrict_managers_to_own', 'true')"
                             " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
                         )
@@ -601,7 +603,10 @@ async def test_stream_hides_foreign_bot_events_when_scoped(app, settings, clean_
                 finally:
                     async with factory() as session:
                         await session.execute(
-                            text("DELETE FROM crm_settings WHERE key = 'restrict_managers_to_own'")
+                            text(
+                                "DELETE FROM tcs_crm_settings"
+                                " WHERE key = 'restrict_managers_to_own'"
+                            )
                         )
                         await session.commit()
                 await purge_contacts(factory, [foreign["id"]])
@@ -655,7 +660,7 @@ async def test_poller_restores_cursor_and_replays_small_gap(settings, clean_bus)
     async def clear_cursor() -> None:
         async with factory() as session:
             await session.execute(
-                text("DELETE FROM crm_settings WHERE key = :key"), {"key": CURSOR_SETTING}
+                text("DELETE FROM tcs_crm_settings WHERE key = :key"), {"key": CURSOR_SETTING}
             )
             await session.commit()
 
@@ -735,7 +740,7 @@ async def test_stream_closes_when_session_is_revoked(app, settings, monkeypatch,
                     async with factory() as session:
                         await session.execute(
                             text(
-                                "UPDATE crm_sessions SET revoked_at = now()"
+                                "UPDATE tcs_crm_sessions SET revoked_at = now()"
                                 " WHERE user_id = :user"
                             ),
                             {"user": manager["user"]["id"]},

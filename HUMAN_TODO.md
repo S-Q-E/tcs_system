@@ -49,7 +49,7 @@ placeholders. Deployment detail: `docs/tcs/RAILWAY_DEPLOY.md`.
   1. `docs/n8n/tcs-send-message-telegram.workflow.json` (W-A, CRM → Telegram);
   2. `workflows/tcs_bot.json` (W-B, the bot);
   3. `workflows/tcs_reminders.json` (W-C, reminders).
-- [ ] Create `n8n_processed_outbox` in the demo DB (SQL in
+- [ ] Create `tcs_n8n_processed_outbox` in the demo DB (SQL in
   `docs/n8n/README.md`) — needed by W-A only.
 - [ ] Set `N8N_WEBHOOK_SECRET` in the n8n service env = CRM value.
 - [ ] **MANUAL checks after import** (version-dependent; rebuild by hand from
@@ -60,7 +60,7 @@ placeholders. Deployment detail: `docs/tcs/RAILWAY_DEPLOY.md`.
     resolve inside the tool; otherwise pass booked slots via the prompt.
   - W-B `search_units`, `book_viewing`, `handoff_to_human`: Postgres Tool nodes
     with `$fromAI` parameters.
-  - W-B `Postgres Chat Memory`: first run creates `n8n_chat_histories`.
+  - W-B `Postgres Chat Memory`: first run creates `tcs_n8n_chat_histories`.
 - [ ] Activate all three workflows; Telegram registers the webhook when the bot
   workflow is active. Send a test message.
 - [ ] Test booking end-to-end: the CRM must show the deal on **Viewing

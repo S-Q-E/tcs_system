@@ -14,7 +14,7 @@ depends_on = None
 def upgrade() -> None:
     op.execute(
         sa.text(
-            "INSERT INTO crm_settings (key, value) VALUES"
+            "INSERT INTO tcs_crm_settings (key, value) VALUES"
             ' (\'deal_assignment\', \'{"mode": "unassigned", "last_index": -1}\')'
             " ON CONFLICT (key) DO NOTHING"
         )
@@ -22,4 +22,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(sa.text("DELETE FROM crm_settings WHERE key = 'deal_assignment'"))
+    op.execute(sa.text("DELETE FROM tcs_crm_settings WHERE key = 'deal_assignment'"))

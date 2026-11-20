@@ -19,7 +19,7 @@ async def _wa_of(factory, contact_id: str) -> str | None:
     async with factory() as session:
         return (
             await session.execute(
-                text("SELECT whatsapp_id FROM crm_contacts WHERE id = :id"), {"id": contact_id}
+                text("SELECT whatsapp_id FROM tcs_crm_contacts WHERE id = :id"), {"id": contact_id}
             )
         ).scalar_one()
 

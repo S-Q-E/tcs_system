@@ -17,7 +17,7 @@ VALID_ROLES = (ROLE_ADMIN, ROLE_MANAGER)
 class CrmUser(Base):
     """CRM login account. Roles: admin / manager."""
 
-    __tablename__ = "crm_users"
+    __tablename__ = "tcs_crm_users"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
@@ -34,12 +34,12 @@ class CrmUser(Base):
 class CrmSession(Base):
     """Server-side session. Only the sha256 of the token is stored."""
 
-    __tablename__ = "crm_sessions"
+    __tablename__ = "tcs_crm_sessions"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("crm_users.id", ondelete="CASCADE"),
+        ForeignKey("tcs_crm_users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -62,7 +62,7 @@ class CrmLoginAttempt(Base):
     Rows older than one hour are deleted opportunistically on write.
     """
 
-    __tablename__ = "crm_login_attempts"
+    __tablename__ = "tcs_crm_login_attempts"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     ip: Mapped[str] = mapped_column(String(64), nullable=False)

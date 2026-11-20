@@ -12,23 +12,23 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.drop_constraint("ck_crm_outbox_status", "crm_outbox", type_="check")
+    op.drop_constraint("ck_tcs_crm_outbox_status", "tcs_crm_outbox", type_="check")
     op.add_column(
-        "crm_outbox",
+        "tcs_crm_outbox",
         sa.Column("claimed_at", sa.DateTime(timezone=True), nullable=True),
     )
     op.create_check_constraint(
-        "ck_crm_outbox_status",
-        "crm_outbox",
+        "ck_tcs_crm_outbox_status",
+        "tcs_crm_outbox",
         "status IN ('queued', 'sending', 'sent', 'failed')",
     )
 
 
 def downgrade() -> None:
-    op.drop_constraint("ck_crm_outbox_status", "crm_outbox", type_="check")
-    op.drop_column("crm_outbox", "claimed_at")
+    op.drop_constraint("ck_tcs_crm_outbox_status", "tcs_crm_outbox", type_="check")
+    op.drop_column("tcs_crm_outbox", "claimed_at")
     op.create_check_constraint(
-        "ck_crm_outbox_status",
-        "crm_outbox",
+        "ck_tcs_crm_outbox_status",
+        "tcs_crm_outbox",
         "status IN ('queued', 'sent', 'failed')",
     )

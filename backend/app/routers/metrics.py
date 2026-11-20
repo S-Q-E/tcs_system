@@ -48,12 +48,16 @@ async def metrics(
     extra: list[str] = []
     try:
         counts = (
-            (await session.execute(text("SELECT status, COUNT(*) FROM crm_outbox GROUP BY status")))
+            (
+                await session.execute(
+                    text("SELECT status, COUNT(*) FROM tcs_crm_outbox GROUP BY status")
+                )
+            )
             .mappings()
             .all()
         )
         for row in counts:
-            extra.append(f'crm_outbox_messages{{status="{row["status"]}"}} {int(row["count"])}')
+            extra.append(f'tcs_crm_outbox_messages{{status="{row["status"]}"}} {int(row["count"])}')
     except Exception as exc:
         logger.warning("metrics outbox gauge failed: %s", type(exc).__name__)
     try:

@@ -18,7 +18,7 @@ async def _state(factory, wa: str, *, direction: str, paused: bool, at, assigned
     async with factory() as session:
         await session.execute(
             text(
-                "INSERT INTO crm_conversation_state"
+                "INSERT INTO tcs_crm_conversation_state"
                 " (whatsapp_id, bot_paused, last_message_direction, last_message_at, assigned_to)"
                 " VALUES (:wa, :paused, :direction, :at, :assigned)"
             ),
@@ -30,11 +30,11 @@ async def _state(factory, wa: str, *, direction: str, paused: bool, at, assigned
 async def _cleanup(factory) -> None:
     async with factory() as session:
         await session.execute(
-            text("DELETE FROM crm_notifications WHERE dedupe_key LIKE :p"),
+            text("DELETE FROM tcs_crm_notifications WHERE dedupe_key LIKE :p"),
             {"p": f"unanswered:{PREFIX}%"},
         )
         await session.execute(
-            text("DELETE FROM crm_conversation_state WHERE whatsapp_id LIKE :p"),
+            text("DELETE FROM tcs_crm_conversation_state WHERE whatsapp_id LIKE :p"),
             {"p": PREFIX + "%"},
         )
         await session.commit()
@@ -119,7 +119,7 @@ async def test_unanswered_notification_once_per_episode(client, settings):
                 return (
                     await session.execute(
                         text(
-                            "SELECT COUNT(*) FROM crm_notifications"
+                            "SELECT COUNT(*) FROM tcs_crm_notifications"
                             " WHERE type = 'unanswered' AND user_id = :u"
                             " AND dedupe_key LIKE :k"
                         ),
@@ -134,7 +134,7 @@ async def test_unanswered_notification_once_per_episode(client, settings):
 
         async with factory() as session:
             await session.execute(
-                text("UPDATE crm_notifications SET read_at = now() WHERE dedupe_key LIKE :k"),
+                text("UPDATE tcs_crm_notifications SET read_at = now() WHERE dedupe_key LIKE :k"),
                 {"k": key + "%"},
             )
             await session.commit()

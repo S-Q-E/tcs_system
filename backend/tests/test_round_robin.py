@@ -29,13 +29,15 @@ async def _set_round_robin(factory, enabled: bool) -> None:
         if enabled:
             await session.execute(
                 text(
-                    "INSERT INTO crm_settings (key, value) VALUES"
+                    "INSERT INTO tcs_crm_settings (key, value) VALUES"
                     ' (\'deal_assignment\', \'{"mode": "round_robin", "last_index": -1}\')'
                     " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
                 )
             )
         else:
-            await session.execute(text("DELETE FROM crm_settings WHERE key = 'deal_assignment'"))
+            await session.execute(
+                text("DELETE FROM tcs_crm_settings WHERE key = 'deal_assignment'")
+            )
         await session.commit()
 
 
@@ -73,7 +75,7 @@ async def test_parallel_deal_creation_distributes_evenly(client, settings):
             async with factory() as session:
                 await session.execute(
                     text(
-                        "UPDATE crm_users SET is_active = false"
+                        "UPDATE tcs_crm_users SET is_active = false"
                         " WHERE role = 'manager' AND is_active"
                         f" AND id NOT IN ('{first['user']['id']}', '{second['user']['id']}')"
                     )
@@ -84,7 +86,7 @@ async def test_parallel_deal_creation_distributes_evenly(client, settings):
             finally:
                 async with factory() as session:
                     await session.execute(
-                        text("UPDATE crm_users SET is_active = true WHERE role = 'manager'")
+                        text("UPDATE tcs_crm_users SET is_active = true WHERE role = 'manager'")
                     )
                     await session.commit()
         finally:
@@ -100,7 +102,7 @@ async def test_parallel_deal_creation_distributes_evenly(client, settings):
             deal_ids = (
                 (
                     await session.execute(
-                        text("SELECT id FROM crm_deals WHERE contact_id = :id"),
+                        text("SELECT id FROM tcs_crm_deals WHERE contact_id = :id"),
                         {"id": contact["id"]},
                     )
                 )
@@ -109,6 +111,6 @@ async def test_parallel_deal_creation_distributes_evenly(client, settings):
             )
             deal_ids = [str(d) for d in deal_ids]
     finally:
-        await purge_rows(factory, "crm_deals", deal_ids)
+        await purge_rows(factory, "tcs_crm_deals", deal_ids)
         await purge_contacts(factory, contact_ids)
         await engine.dispose()

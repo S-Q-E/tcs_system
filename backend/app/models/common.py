@@ -28,7 +28,7 @@ VALID_FIELD_ENTITIES = (ENTITY_CONTACT, ENTITY_DEAL)
 class CrmLostReason(Base):
     """Refusal reasons for lost deals."""
 
-    __tablename__ = "crm_lost_reasons"
+    __tablename__ = "tcs_crm_lost_reasons"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
@@ -38,7 +38,7 @@ class CrmLostReason(Base):
 class CrmTag(Base):
     """Shared tags for contacts and deals."""
 
-    __tablename__ = "crm_tags"
+    __tablename__ = "tcs_crm_tags"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
@@ -48,16 +48,16 @@ class CrmTag(Base):
 class CrmEntityTag(Base):
     """Tag attached to a contact or a deal."""
 
-    __tablename__ = "crm_entity_tags"
+    __tablename__ = "tcs_crm_entity_tags"
     __table_args__ = (
-        CheckConstraint("entity IN ('contact', 'deal')", name="ck_crm_entity_tags_entity"),
-        UniqueConstraint("tag_id", "entity", "entity_id", name="uq_crm_entity_tags_target"),
+        CheckConstraint("entity IN ('contact', 'deal')", name="ck_tcs_crm_entity_tags_entity"),
+        UniqueConstraint("tag_id", "entity", "entity_id", name="uq_tcs_crm_entity_tags_target"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tag_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("crm_tags.id", ondelete="CASCADE"),
+        ForeignKey("tcs_crm_tags.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -68,14 +68,14 @@ class CrmEntityTag(Base):
 class CrmCustomField(Base):
     """Custom field definition for contacts or deals."""
 
-    __tablename__ = "crm_custom_fields"
+    __tablename__ = "tcs_crm_custom_fields"
     __table_args__ = (
-        CheckConstraint("entity IN ('contact', 'deal')", name="ck_crm_custom_fields_entity"),
+        CheckConstraint("entity IN ('contact', 'deal')", name="ck_tcs_crm_custom_fields_entity"),
         CheckConstraint(
             "type IN ('text', 'number', 'date', 'select', 'multiselect', 'bool')",
-            name="ck_crm_custom_fields_type",
+            name="ck_tcs_crm_custom_fields_type",
         ),
-        UniqueConstraint("entity", "key", name="uq_crm_custom_fields_entity_key"),
+        UniqueConstraint("entity", "key", name="uq_tcs_crm_custom_fields_entity_key"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -91,7 +91,7 @@ class CrmCustomField(Base):
 class CrmSetting(Base):
     """Key-value CRM settings (JSONB values)."""
 
-    __tablename__ = "crm_settings"
+    __tablename__ = "tcs_crm_settings"
 
     key: Mapped[str] = mapped_column(Text, primary_key=True)
     value: Mapped[dict | list | str | int | float | bool | None] = mapped_column(
@@ -102,12 +102,12 @@ class CrmSetting(Base):
 class CrmActivityLog(Base):
     """Audit trail for CRM entity changes."""
 
-    __tablename__ = "crm_activity_log"
+    __tablename__ = "tcs_crm_activity_log"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     actor_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("crm_users.id", ondelete="SET NULL"),
+        ForeignKey("tcs_crm_users.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )

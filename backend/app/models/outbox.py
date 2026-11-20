@@ -36,11 +36,11 @@ class CrmOutbox(Base):
     tcs_messages. ``tcs_message_id`` links the exact mirrored row for
     timeline attribution."""
 
-    __tablename__ = "crm_outbox"
+    __tablename__ = "tcs_crm_outbox"
     __table_args__ = (
         CheckConstraint(
             "status IN ('queued', 'sending', 'sent', 'failed')",
-            name="ck_crm_outbox_status",
+            name="ck_tcs_crm_outbox_status",
         ),
     )
 
@@ -49,7 +49,7 @@ class CrmOutbox(Base):
     body: Mapped[str] = mapped_column(Text, nullable=False)
     sent_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("crm_users.id", ondelete="SET NULL"),
+        ForeignKey("tcs_crm_users.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
@@ -71,7 +71,7 @@ class CrmOutbox(Base):
 class CrmQuickReply(Base):
     """Manager message templates. ``{name}`` is substituted with the contact name."""
 
-    __tablename__ = "crm_quick_replies"
+    __tablename__ = "tcs_crm_quick_replies"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)

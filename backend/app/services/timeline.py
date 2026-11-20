@@ -129,7 +129,7 @@ async def _messages(
                 "SELECT m.id, m.direction, m.message_type, m.content, m.stage_at_moment,"
                 " m.tokens_used, m.response_time_ms, m.created_at,"
                 " o.sent_by AS outbox_sent_by FROM tcs_messages m"
-                " LEFT JOIN crm_outbox o ON o.tcs_message_id = m.id"
+                " LEFT JOIN tcs_crm_outbox o ON o.tcs_message_id = m.id"
                 " WHERE m.whatsapp_id = :wa AND "
                 f"{_keyset_text('m.created_at', 0, True, cursor, 'm.id')}"
                 " ORDER BY m.created_at DESC, m.id DESC LIMIT :limit"
@@ -201,9 +201,9 @@ async def _stages(
             text(
                 "SELECT h.id, h.from_stage_id, h.to_stage_id, h.changed_by, h.source, h.at,"
                 " fs.name AS from_name, ts.name AS to_name"
-                " FROM crm_deal_stage_history h"
-                " LEFT JOIN crm_stages fs ON fs.id = h.from_stage_id"
-                " LEFT JOIN crm_stages ts ON ts.id = h.to_stage_id"
+                " FROM tcs_crm_deal_stage_history h"
+                " LEFT JOIN tcs_crm_stages fs ON fs.id = h.from_stage_id"
+                " LEFT JOIN tcs_crm_stages ts ON ts.id = h.to_stage_id"
                 f" WHERE h.deal_id = :deal AND {_keyset_text('h.at', 2, False, cursor)}"
                 " ORDER BY h.at DESC, h.id DESC LIMIT :limit"
             ),
@@ -241,7 +241,7 @@ async def _notes(
     rows = (
         await session.execute(
             text(
-                "SELECT id, body, author_id, pinned, created_at FROM crm_notes"
+                "SELECT id, body, author_id, pinned, created_at FROM tcs_crm_notes"
                 f" WHERE (deal_id = :deal OR contact_id = :contact)"
                 f" AND {_keyset_text('created_at', 3, False, cursor)}"
                 " ORDER BY created_at DESC, id DESC LIMIT :limit"
@@ -273,7 +273,8 @@ async def _tasks(
     rows = (
         await session.execute(
             text(
-                "SELECT id, title, type, assignee_id, due_at, done_at, created_at FROM crm_tasks"
+                "SELECT id, title, type, assignee_id, due_at, done_at, created_at"
+                " FROM tcs_crm_tasks"
                 f" WHERE (deal_id = :deal OR contact_id = :contact)"
                 f" AND {_keyset_text('created_at', 4, False, cursor)}"
                 " ORDER BY created_at DESC, id DESC LIMIT :limit"
@@ -307,7 +308,7 @@ async def _activity(
     rows = (
         await session.execute(
             text(
-                "SELECT id, entity, action, actor_id, diff, created_at FROM crm_activity_log"
+                "SELECT id, entity, action, actor_id, diff, created_at FROM tcs_crm_activity_log"
                 " WHERE ((entity = 'deal' AND entity_id = :deal)"
                 " OR (entity = 'contact' AND entity_id = :contact))"
                 f" AND {_keyset_text('created_at', 5, False, cursor)}"
@@ -357,10 +358,10 @@ async def get_contact_timeline(
                     "SELECT h.id, h.from_stage_id, h.to_stage_id, h.changed_by,"
                     " h.source, h.at, h.deal_id,"
                     " fs.name AS from_name, ts.name AS to_name"
-                    " FROM crm_deal_stage_history h"
-                    " JOIN crm_deals d ON d.id = h.deal_id"
-                    " LEFT JOIN crm_stages fs ON fs.id = h.from_stage_id"
-                    " LEFT JOIN crm_stages ts ON ts.id = h.to_stage_id"
+                    " FROM tcs_crm_deal_stage_history h"
+                    " JOIN tcs_crm_deals d ON d.id = h.deal_id"
+                    " LEFT JOIN tcs_crm_stages fs ON fs.id = h.from_stage_id"
+                    " LEFT JOIN tcs_crm_stages ts ON ts.id = h.to_stage_id"
                     f" WHERE d.contact_id = :contact AND {keyset}"
                     " ORDER BY h.at DESC, h.id DESC LIMIT :limit"
                 ),
@@ -394,7 +395,7 @@ async def get_contact_timeline(
             await session.execute(
                 _text(
                     "SELECT n.id, n.body, n.author_id, n.pinned, n.created_at, n.deal_id"
-                    " FROM crm_notes n LEFT JOIN crm_deals d ON d.id = n.deal_id"
+                    " FROM tcs_crm_notes n LEFT JOIN tcs_crm_deals d ON d.id = n.deal_id"
                     " WHERE (n.contact_id = :contact OR d.contact_id = :contact)"
                     f" AND {_keyset_text('n.created_at', 3, False, cursor)}"
                     " ORDER BY n.created_at DESC, n.id DESC LIMIT :limit"
@@ -423,7 +424,7 @@ async def get_contact_timeline(
                 _text(
                     "SELECT t.id, t.title, t.type, t.assignee_id, t.due_at,"
                     " t.done_at, t.created_at, t.deal_id"
-                    " FROM crm_tasks t LEFT JOIN crm_deals d ON d.id = t.deal_id"
+                    " FROM tcs_crm_tasks t LEFT JOIN tcs_crm_deals d ON d.id = t.deal_id"
                     " WHERE (t.contact_id = :contact OR d.contact_id = :contact)"
                     f" AND {_keyset_text('t.created_at', 4, False, cursor)}"
                     " ORDER BY t.created_at DESC, t.id DESC LIMIT :limit"
@@ -453,7 +454,7 @@ async def get_contact_timeline(
             await session.execute(
                 _text(
                     "SELECT a.id, a.entity, a.action, a.actor_id, a.diff, a.created_at"
-                    " FROM crm_activity_log a LEFT JOIN crm_deals d"
+                    " FROM tcs_crm_activity_log a LEFT JOIN tcs_crm_deals d"
                     " ON (a.entity = 'deal' AND a.entity_id = d.id)"
                     " WHERE (a.entity = 'contact' AND a.entity_id = :contact)"
                     " OR (a.entity = 'deal' AND d.contact_id = :contact)"
@@ -503,7 +504,7 @@ async def _enrich(
     if user_ids:
         rows = (
             await session.execute(
-                text("SELECT id::text AS id, name FROM crm_users WHERE id::text = ANY(:ids)"),
+                text("SELECT id::text AS id, name FROM tcs_crm_users WHERE id::text = ANY(:ids)"),
                 {"ids": list(user_ids)},
             )
         ).mappings()

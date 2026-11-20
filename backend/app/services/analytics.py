@@ -112,12 +112,14 @@ async def resolve_filters(
     else:
         row = (
             await session.execute(
-                text("SELECT id FROM crm_pipelines WHERE is_default ORDER BY sort LIMIT 1")
+                text("SELECT id FROM tcs_crm_pipelines WHERE is_default ORDER BY sort LIMIT 1")
             )
         ).scalar_one_or_none()
         if row is None:
             row = (
-                await session.execute(text("SELECT id FROM crm_pipelines ORDER BY sort LIMIT 1"))
+                await session.execute(
+                    text("SELECT id FROM tcs_crm_pipelines ORDER BY sort LIMIT 1")
+                )
             ).scalar_one_or_none()
         if row is None:
             raise ApiError("NO_PIPELINE", "No pipeline exists yet", 404)
@@ -134,7 +136,7 @@ async def resolve_filters(
 
     restricted = (
         await session.execute(
-            text("SELECT value FROM crm_settings WHERE key = 'restrict_managers_to_own'")
+            text("SELECT value FROM tcs_crm_settings WHERE key = 'restrict_managers_to_own'")
         )
     ).scalar_one_or_none() is True
     if restricted and not user.is_admin:
@@ -159,7 +161,7 @@ async def resolve_filters(
 
 
 def _deal_scope(owner_column: str, filters: AnalyticsFilters, user_param: str = "user_id") -> str:
-    """SQL fragment limiting crm_deals rows to the visible owner scope."""
+    """SQL fragment limiting tcs_crm_deals rows to the visible owner scope."""
     if filters.owner_id is not None:
         return f"AND {owner_column} = :owner_id"
     if filters.restricted:
@@ -195,7 +197,7 @@ async def _stages(session: AsyncSession, filters: AnalyticsFilters) -> list[dict
         (
             await session.execute(
                 text(
-                    "SELECT id, name, kind, sort, bot_stage_key FROM crm_stages"
+                    "SELECT id, name, kind, sort, bot_stage_key FROM tcs_crm_stages"
                     " WHERE pipeline_id = :pipeline_id ORDER BY sort, name"
                 ),
                 {"pipeline_id": str(filters.pipeline_id)},
@@ -214,8 +216,8 @@ async def funnel_section(session: AsyncSession, filters: AnalyticsFilters) -> di
         (
             await session.execute(
                 text(
-                    "SELECT d.id, d.stage_id, d.status, c.whatsapp_id FROM crm_deals d"
-                    " JOIN crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
+                    "SELECT d.id, d.stage_id, d.status, c.whatsapp_id FROM tcs_crm_deals d"
+                    " JOIN tcs_crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
                     " WHERE d.deleted_at IS NULL AND d.pipeline_id = :pipeline_id"
                     " AND d.created_at >= :start AND d.created_at < :end"
                     f" {_deal_scope('d.owner_id', filters)}"
@@ -236,7 +238,7 @@ async def funnel_section(session: AsyncSession, filters: AnalyticsFilters) -> di
                 await session.execute(
                     text(
                         "SELECT deal_id, from_stage_id, to_stage_id, at"
-                        " FROM crm_deal_stage_history WHERE deal_id = ANY(:ids)"
+                        " FROM tcs_crm_deal_stage_history WHERE deal_id = ANY(:ids)"
                         " ORDER BY at, id"
                     ),
                     {"ids": deal_ids},
@@ -365,7 +367,7 @@ async def summary_section(session: AsyncSession, filters: AnalyticsFilters) -> d
         await session.execute(
             text(
                 "SELECT COUNT(*) FROM tcs_leads l"
-                " LEFT JOIN crm_contacts c ON c.whatsapp_id = l.whatsapp_id"
+                " LEFT JOIN tcs_crm_contacts c ON c.whatsapp_id = l.whatsapp_id"
                 " AND c.deleted_at IS NULL"
                 " WHERE l.created_at >= :start AND l.created_at < :end"
                 f" {_contact_scope('c.owner_id', filters)}"
@@ -377,8 +379,8 @@ async def summary_section(session: AsyncSession, filters: AnalyticsFilters) -> d
     trials = (
         await session.execute(
             text(
-                "SELECT COUNT(*) FROM crm_deals d"
-                " JOIN crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
+                "SELECT COUNT(*) FROM tcs_crm_deals d"
+                " JOIN tcs_crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
                 " WHERE d.deleted_at IS NULL AND d.pipeline_id = :pipeline_id"
                 " AND d.trial_at >= :start AND d.trial_at < :end"
                 f" {_deal_scope('d.owner_id', filters)}"
@@ -390,8 +392,8 @@ async def summary_section(session: AsyncSession, filters: AnalyticsFilters) -> d
         (
             await session.execute(
                 text(
-                    "SELECT d.status, COUNT(*), COALESCE(SUM(d.amount), 0) FROM crm_deals d"
-                    " JOIN crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
+                    "SELECT d.status, COUNT(*), COALESCE(SUM(d.amount), 0) FROM tcs_crm_deals d"
+                    " JOIN tcs_crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
                     " WHERE d.deleted_at IS NULL AND d.pipeline_id = :pipeline_id"
                     " AND d.closed_at >= :start AND d.closed_at < :end"
                     f" {_deal_scope('d.owner_id', filters)}"
@@ -411,9 +413,9 @@ async def summary_section(session: AsyncSession, filters: AnalyticsFilters) -> d
         (
             await session.execute(
                 text(
-                    "SELECT r.id, r.name, COUNT(*) FROM crm_deals d"
-                    " LEFT JOIN crm_lost_reasons r ON r.id = d.lost_reason_id"
-                    " JOIN crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
+                    "SELECT r.id, r.name, COUNT(*) FROM tcs_crm_deals d"
+                    " LEFT JOIN tcs_crm_lost_reasons r ON r.id = d.lost_reason_id"
+                    " JOIN tcs_crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
                     " WHERE d.deleted_at IS NULL AND d.pipeline_id = :pipeline_id"
                     " AND d.status = 'lost' AND d.closed_at >= :start AND d.closed_at < :end"
                     f" {_deal_scope('d.owner_id', filters)}"
@@ -453,7 +455,7 @@ async def dynamics_buckets(session: AsyncSession, filters: AnalyticsFilters) -> 
                 text(
                     "SELECT DATE((l.created_at AT TIME ZONE :tz)) AS d, COUNT(*)"
                     " FROM tcs_leads l"
-                    " LEFT JOIN crm_contacts c ON c.whatsapp_id = l.whatsapp_id"
+                    " LEFT JOIN tcs_crm_contacts c ON c.whatsapp_id = l.whatsapp_id"
                     " AND c.deleted_at IS NULL"
                     " WHERE l.created_at >= :start AND l.created_at < :end"
                     f" {_contact_scope('c.owner_id', filters)}"
@@ -470,8 +472,8 @@ async def dynamics_buckets(session: AsyncSession, filters: AnalyticsFilters) -> 
         (
             await session.execute(
                 text(
-                    "SELECT DATE((d.trial_at AT TIME ZONE :tz)) AS d, COUNT(*) FROM crm_deals d"
-                    " JOIN crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
+                    "SELECT DATE((d.trial_at AT TIME ZONE :tz)) AS d, COUNT(*) FROM tcs_crm_deals d"
+                    " JOIN tcs_crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
                     " WHERE d.deleted_at IS NULL AND d.pipeline_id = :pipeline_id"
                     " AND d.trial_at >= :start AND d.trial_at < :end"
                     f" {_deal_scope('d.owner_id', filters)}"
@@ -488,8 +490,8 @@ async def dynamics_buckets(session: AsyncSession, filters: AnalyticsFilters) -> 
             await session.execute(
                 text(
                     "SELECT DATE((d.closed_at AT TIME ZONE :tz)) AS d, COUNT(*),"
-                    " COALESCE(SUM(d.amount), 0) FROM crm_deals d"
-                    " JOIN crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
+                    " COALESCE(SUM(d.amount), 0) FROM tcs_crm_deals d"
+                    " JOIN tcs_crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
                     " WHERE d.deleted_at IS NULL AND d.pipeline_id = :pipeline_id"
                     " AND d.status = 'won' AND d.closed_at >= :start AND d.closed_at < :end"
                     f" {_deal_scope('d.owner_id', filters)}"
@@ -505,8 +507,9 @@ async def dynamics_buckets(session: AsyncSession, filters: AnalyticsFilters) -> 
         (
             await session.execute(
                 text(
-                    "SELECT DATE((d.closed_at AT TIME ZONE :tz)) AS d, COUNT(*) FROM crm_deals d"
-                    " JOIN crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
+                    "SELECT DATE((d.closed_at AT TIME ZONE :tz)) AS d, COUNT(*)"
+                    " FROM tcs_crm_deals d"
+                    " JOIN tcs_crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
                     " WHERE d.deleted_at IS NULL AND d.pipeline_id = :pipeline_id"
                     " AND d.status = 'lost' AND d.closed_at >= :start AND d.closed_at < :end"
                     f" {_deal_scope('d.owner_id', filters)}"
@@ -554,7 +557,7 @@ async def managers_section(session: AsyncSession, filters: AnalyticsFilters) -> 
         (
             await session.execute(
                 text(
-                    "SELECT id, name FROM crm_users WHERE is_active"
+                    "SELECT id, name FROM tcs_crm_users WHERE is_active"
                     + (" AND id = :owner_id" if filters.owner_id is not None else "")
                     + " ORDER BY name"
                 ),
@@ -579,8 +582,8 @@ async def managers_section(session: AsyncSession, filters: AnalyticsFilters) -> 
         (
             await session.execute(
                 text(
-                    "SELECT d.owner_id, COUNT(*) FROM crm_deals d"
-                    " JOIN crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
+                    "SELECT d.owner_id, COUNT(*) FROM tcs_crm_deals d"
+                    " JOIN tcs_crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
                     " WHERE d.deleted_at IS NULL AND d.pipeline_id = :pipeline_id"
                     " AND d.status = 'open' AND d.owner_id = ANY(:uids)"
                     " GROUP BY d.owner_id"
@@ -597,8 +600,8 @@ async def managers_section(session: AsyncSession, filters: AnalyticsFilters) -> 
             await session.execute(
                 text(
                     "SELECT d.owner_id, d.status, COUNT(*), COALESCE(SUM(d.amount), 0)"
-                    " FROM crm_deals d"
-                    " JOIN crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
+                    " FROM tcs_crm_deals d"
+                    " JOIN tcs_crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
                     " WHERE d.deleted_at IS NULL AND d.pipeline_id = :pipeline_id"
                     " AND d.owner_id = ANY(:uids)"
                     " AND d.closed_at >= :start AND d.closed_at < :end"
@@ -617,7 +620,7 @@ async def managers_section(session: AsyncSession, filters: AnalyticsFilters) -> 
         (
             await session.execute(
                 text(
-                    "SELECT assignee_id, COUNT(*) FROM crm_tasks"
+                    "SELECT assignee_id, COUNT(*) FROM tcs_crm_tasks"
                     " WHERE assignee_id = ANY(:uids)"
                     " AND done_at >= :start AND done_at < :end"
                     " GROUP BY assignee_id"
@@ -633,7 +636,7 @@ async def managers_section(session: AsyncSession, filters: AnalyticsFilters) -> 
         (
             await session.execute(
                 text(
-                    "SELECT assignee_id, COUNT(*) FROM crm_tasks"
+                    "SELECT assignee_id, COUNT(*) FROM tcs_crm_tasks"
                     " WHERE assignee_id = ANY(:uids) AND done_at IS NULL"
                     " AND due_at IS NOT NULL AND due_at < :now"
                     " GROUP BY assignee_id"
@@ -649,8 +652,8 @@ async def managers_section(session: AsyncSession, filters: AnalyticsFilters) -> 
         (
             await session.execute(
                 text(
-                    "SELECT d.owner_id, c.whatsapp_id FROM crm_deals d"
-                    " JOIN crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
+                    "SELECT d.owner_id, c.whatsapp_id FROM tcs_crm_deals d"
+                    " JOIN tcs_crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
                     " WHERE d.deleted_at IS NULL AND d.pipeline_id = :pipeline_id"
                     " AND d.owner_id = ANY(:uids) AND c.whatsapp_id IS NOT NULL"
                 ),
@@ -726,7 +729,7 @@ async def _avg_first_response_by_owner(
 async def bot_section(session: AsyncSession, filters: AnalyticsFilters) -> dict:
     params = _params(filters)
     restriction_join = (
-        " LEFT JOIN crm_contacts c ON c.whatsapp_id = m.whatsapp_id AND c.deleted_at IS NULL"
+        " LEFT JOIN tcs_crm_contacts c ON c.whatsapp_id = m.whatsapp_id AND c.deleted_at IS NULL"
         if filters.restricted or filters.owner_id is not None
         else ""
     )
@@ -782,7 +785,7 @@ async def bot_section(session: AsyncSession, filters: AnalyticsFilters) -> dict:
             await session.execute(
                 text(
                     "SELECT l.whatsapp_id, l.status FROM tcs_leads l"
-                    " LEFT JOIN crm_contacts c ON c.whatsapp_id = l.whatsapp_id"
+                    " LEFT JOIN tcs_crm_contacts c ON c.whatsapp_id = l.whatsapp_id"
                     " AND c.deleted_at IS NULL"
                     " WHERE l.created_at >= :start AND l.created_at < :end"
                     f"{lead_filter}"
@@ -821,7 +824,7 @@ async def bot_section(session: AsyncSession, filters: AnalyticsFilters) -> dict:
             await session.execute(
                 text(
                     "SELECT l.last_objection AS objection, COUNT(*) FROM tcs_leads l"
-                    " LEFT JOIN crm_contacts c ON c.whatsapp_id = l.whatsapp_id"
+                    " LEFT JOIN tcs_crm_contacts c ON c.whatsapp_id = l.whatsapp_id"
                     " AND c.deleted_at IS NULL"
                     " WHERE l.created_at >= :start AND l.created_at < :end"
                     " AND l.last_objection IS NOT NULL AND l.last_objection <> ''"
@@ -838,7 +841,7 @@ async def bot_section(session: AsyncSession, filters: AnalyticsFilters) -> dict:
             await session.execute(
                 text(
                     "SELECT l.current_stage AS stage, COUNT(*) FROM tcs_leads l"
-                    " LEFT JOIN crm_contacts c ON c.whatsapp_id = l.whatsapp_id"
+                    " LEFT JOIN tcs_crm_contacts c ON c.whatsapp_id = l.whatsapp_id"
                     " AND c.deleted_at IS NULL"
                     " WHERE l.created_at >= :start AND l.created_at < :end"
                     f"{lead_filter} GROUP BY 1 ORDER BY 2 DESC"
@@ -853,7 +856,7 @@ async def bot_section(session: AsyncSession, filters: AnalyticsFilters) -> dict:
         await session.execute(
             text(
                 "SELECT COUNT(*) AS n FROM tcs_leads l"
-                " LEFT JOIN crm_contacts c ON c.whatsapp_id = l.whatsapp_id"
+                " LEFT JOIN tcs_crm_contacts c ON c.whatsapp_id = l.whatsapp_id"
                 " AND c.deleted_at IS NULL"
                 " WHERE l.created_at >= :start AND l.created_at < :end"
                 # Outside Mon-Fri 09:00-17:00 in the app timezone.
@@ -902,7 +905,7 @@ async def sources_tags_section(session: AsyncSession, filters: AnalyticsFilters)
             await session.execute(
                 text(
                     "SELECT COALESCE(NULLIF(c.source, ''), 'unknown') AS source, COUNT(*)"
-                    " FROM crm_contacts c WHERE c.deleted_at IS NULL"
+                    " FROM tcs_crm_contacts c WHERE c.deleted_at IS NULL"
                     " AND c.created_at >= :start AND c.created_at < :end"
                     f" {_contact_scope('c.owner_id', filters)}"
                     " GROUP BY 1 ORDER BY 2 DESC"
@@ -920,8 +923,8 @@ async def sources_tags_section(session: AsyncSession, filters: AnalyticsFilters)
                     "SELECT COALESCE(NULLIF(c.source, ''), 'unknown') AS source,"
                     " COUNT(*) FILTER (WHERE d.status = 'won') AS won,"
                     " COALESCE(SUM(d.amount) FILTER (WHERE d.status = 'won'), 0) AS won_sum"
-                    " FROM crm_deals d"
-                    " JOIN crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
+                    " FROM tcs_crm_deals d"
+                    " JOIN tcs_crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
                     " WHERE d.deleted_at IS NULL AND d.pipeline_id = :pipeline_id"
                     " AND d.created_at >= :start AND d.created_at < :end"
                     f" {_deal_scope('d.owner_id', filters)}"
@@ -938,10 +941,10 @@ async def sources_tags_section(session: AsyncSession, filters: AnalyticsFilters)
         (
             await session.execute(
                 text(
-                    "SELECT t.id, t.name, COUNT(DISTINCT d.id) FROM crm_tags t"
-                    " JOIN crm_entity_tags et ON et.tag_id = t.id AND et.entity = 'deal'"
-                    " JOIN crm_deals d ON d.id = et.entity_id AND d.deleted_at IS NULL"
-                    " JOIN crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
+                    "SELECT t.id, t.name, COUNT(DISTINCT d.id) FROM tcs_crm_tags t"
+                    " JOIN tcs_crm_entity_tags et ON et.tag_id = t.id AND et.entity = 'deal'"
+                    " JOIN tcs_crm_deals d ON d.id = et.entity_id AND d.deleted_at IS NULL"
+                    " JOIN tcs_crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
                     " WHERE d.pipeline_id = :pipeline_id"
                     " AND d.created_at >= :start AND d.created_at < :end"
                     f" {_deal_scope('d.owner_id', filters)}"
@@ -959,10 +962,10 @@ async def sources_tags_section(session: AsyncSession, filters: AnalyticsFilters)
                 text(
                     "SELECT t.id, COUNT(*) FILTER (WHERE d.status = 'won') AS won,"
                     " COALESCE(SUM(d.amount) FILTER (WHERE d.status = 'won'), 0) AS won_sum"
-                    " FROM crm_tags t"
-                    " JOIN crm_entity_tags et ON et.tag_id = t.id AND et.entity = 'deal'"
-                    " JOIN crm_deals d ON d.id = et.entity_id AND d.deleted_at IS NULL"
-                    " JOIN crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
+                    " FROM tcs_crm_tags t"
+                    " JOIN tcs_crm_entity_tags et ON et.tag_id = t.id AND et.entity = 'deal'"
+                    " JOIN tcs_crm_deals d ON d.id = et.entity_id AND d.deleted_at IS NULL"
+                    " JOIN tcs_crm_contacts c ON c.id = d.contact_id AND c.deleted_at IS NULL"
                     " WHERE d.pipeline_id = :pipeline_id"
                     " AND d.closed_at >= :start AND d.closed_at < :end"
                     f" {_deal_scope('d.owner_id', filters)}"

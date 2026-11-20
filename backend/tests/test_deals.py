@@ -118,7 +118,7 @@ async def test_deal_crud_and_status_flow(client, settings):
         assert stage["id"]  # open stage fixture used above
     finally:
         await purge_contacts(factory, contact_ids)
-        await purge_rows(factory, "crm_lost_reasons", reason_ids)
+        await purge_rows(factory, "tcs_crm_lost_reasons", reason_ids)
         await engine.dispose()
 
 
@@ -208,7 +208,7 @@ async def test_move_locks_and_calls_bridge(client, settings):
                     await session.execute(
                         text(
                             "SELECT source, changed_by IS NOT NULL AS by_user"
-                            " FROM crm_deal_stage_history WHERE deal_id = :id ORDER BY at"
+                            " FROM tcs_crm_deal_stage_history WHERE deal_id = :id ORDER BY at"
                         ),
                         {"id": deal["id"]},
                     )
@@ -286,7 +286,7 @@ async def test_move_to_lost_requires_reason(client, settings):
         assert lost.json()["stage_locked"] is True
     finally:
         await purge_contacts(factory, contact_ids)
-        await purge_rows(factory, "crm_lost_reasons", reason_ids)
+        await purge_rows(factory, "tcs_crm_lost_reasons", reason_ids)
         await engine.dispose()
 
 
@@ -344,7 +344,7 @@ async def test_bulk_operations(client, settings):
             assert any(t["id"] == tag["id"] for t in fetched.json()["tags"])
     finally:
         await purge_contacts(factory, contact_ids)
-        await purge_rows(factory, "crm_tags", tag_ids)
+        await purge_rows(factory, "tcs_crm_tags", tag_ids)
         await engine.dispose()
 
 
@@ -369,7 +369,7 @@ async def test_deal_visibility_scope(client, settings, app):
         async with factory() as session:
             await session.execute(
                 text(
-                    "INSERT INTO crm_settings (key, value) VALUES"
+                    "INSERT INTO tcs_crm_settings (key, value) VALUES"
                     " ('restrict_managers_to_own', 'true')"
                     " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
                 )
@@ -385,7 +385,7 @@ async def test_deal_visibility_scope(client, settings, app):
         finally:
             async with factory() as session:
                 await session.execute(
-                    text("DELETE FROM crm_settings WHERE key = 'restrict_managers_to_own'")
+                    text("DELETE FROM tcs_crm_settings WHERE key = 'restrict_managers_to_own'")
                 )
                 await session.commit()
     finally:

@@ -76,7 +76,8 @@ async def test_settings_get_update_roundtrip(client, settings):
                 mode = (
                     await conn.execute(
                         text(
-                            "SELECT value->>'mode' FROM crm_settings" " WHERE key='deal_assignment'"
+                            "SELECT value->>'mode' FROM tcs_crm_settings"
+                            " WHERE key='deal_assignment'"
                         )
                     )
                 ).scalar_one()
@@ -84,7 +85,7 @@ async def test_settings_get_update_roundtrip(client, settings):
                 logged = (
                     await conn.execute(
                         text(
-                            "SELECT COUNT(*) FROM crm_activity_log"
+                            "SELECT COUNT(*) FROM tcs_crm_activity_log"
                             " WHERE entity='settings' AND action='settings_updated'"
                         )
                     )

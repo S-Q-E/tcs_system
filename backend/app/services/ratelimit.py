@@ -49,13 +49,13 @@ class SlidingWindowLimiter:
 
 
 # NOTE (Step 16a): the in-memory LoginRateLimiter lived here until the
-# failure budget moved to crm_login_attempts (services/login_limits.py).
+# failure budget moved to tcs_crm_login_attempts (services/login_limits.py).
 # SlidingWindowLimiter above still backs the API-wide and send limiters.
 # Step 14: shared buckets for the API-wide middleware (per IP) and the
 # manager-send endpoint (per user). Limits come from Settings; the singletons
 # below only hold state, so tests can reconfigure freely.
 # NOTE (Step 16a): failed-login counting moved to the DB table
-# crm_login_attempts (services/login_limits.py) so the budget is shared
+# tcs_crm_login_attempts (services/login_limits.py) so the budget is shared
 # across uvicorn workers; nothing login-related stays in process memory.
 api_limiter = SlidingWindowLimiter()
 send_limiter = SlidingWindowLimiter()

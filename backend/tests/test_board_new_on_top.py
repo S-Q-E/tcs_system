@@ -29,16 +29,16 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 MIGRATION_SQL = (
     "WITH first_open AS ("
     " SELECT DISTINCT ON (pipeline_id) id AS stage_id, pipeline_id"
-    " FROM crm_stages WHERE kind = 'open' ORDER BY pipeline_id, sort, name"
+    " FROM tcs_crm_stages WHERE kind = 'open' ORDER BY pipeline_id, sort, name"
     "), ranked AS ("
     " SELECT d.id,"
     " ROW_NUMBER() OVER ("
     " PARTITION BY d.stage_id ORDER BY d.created_at DESC, d.id"
     " ) AS rn"
-    " FROM crm_deals d JOIN first_open f ON f.stage_id = d.stage_id"
+    " FROM tcs_crm_deals d JOIN first_open f ON f.stage_id = d.stage_id"
     " WHERE d.deleted_at IS NULL"
     ")"
-    " UPDATE crm_deals d SET position = r.rn FROM ranked r WHERE d.id = r.id"
+    " UPDATE tcs_crm_deals d SET position = r.rn FROM ranked r WHERE d.id = r.id"
 )
 
 
@@ -52,8 +52,8 @@ async def _first_open_stage_id(factory):
         return (
             await session.execute(
                 text(
-                    "SELECT s.id FROM crm_stages s"
-                    " JOIN crm_pipelines p ON p.id = s.pipeline_id"
+                    "SELECT s.id FROM tcs_crm_stages s"
+                    " JOIN tcs_crm_pipelines p ON p.id = s.pipeline_id"
                     " WHERE p.is_default AND s.kind = 'open'"
                     " ORDER BY s.sort, s.name LIMIT 1"
                 )
@@ -66,7 +66,7 @@ async def _stage_min(factory, stage_id) -> Decimal | None:
         return (
             await session.execute(
                 text(
-                    "SELECT MIN(position) FROM crm_deals"
+                    "SELECT MIN(position) FROM tcs_crm_deals"
                     " WHERE stage_id = :s AND deleted_at IS NULL"
                 ),
                 {"s": str(stage_id)},
@@ -79,7 +79,7 @@ async def _purge_was(factory, was: list[str]) -> None:
         contact_ids = (
             (
                 await session.execute(
-                    text("SELECT id FROM crm_contacts WHERE whatsapp_id = ANY(:ids)"),
+                    text("SELECT id FROM tcs_crm_contacts WHERE whatsapp_id = ANY(:ids)"),
                     {"ids": was},
                 )
             )
@@ -89,7 +89,7 @@ async def _purge_was(factory, was: list[str]) -> None:
     await purge_contacts(factory, [str(i) for i in contact_ids])
     async with factory() as session:
         await session.execute(
-            text("DELETE FROM crm_conversation_state WHERE whatsapp_id = ANY(:ids)"),
+            text("DELETE FROM tcs_crm_conversation_state WHERE whatsapp_id = ANY(:ids)"),
             {"ids": was},
         )
         await session.execute(
@@ -120,8 +120,8 @@ async def test_sync_new_deal_lands_on_top(settings):
             pos = (
                 await session.execute(
                     text(
-                        "SELECT d.position FROM crm_deals d"
-                        " JOIN crm_contacts c ON c.id = d.contact_id"
+                        "SELECT d.position FROM tcs_crm_deals d"
+                        " JOIN tcs_crm_contacts c ON c.id = d.contact_id"
                         " WHERE c.whatsapp_id = :wa AND d.deleted_at IS NULL"
                     ),
                     {"wa": wa},
@@ -161,8 +161,8 @@ async def test_sync_batch_keeps_creation_order(settings):
                 (
                     await session.execute(
                         text(
-                            "SELECT c.whatsapp_id AS wa, d.position AS pos FROM crm_deals d"
-                            " JOIN crm_contacts c ON c.id = d.contact_id"
+                            "SELECT c.whatsapp_id AS wa, d.position AS pos FROM tcs_crm_deals d"
+                            " JOIN tcs_crm_contacts c ON c.id = d.contact_id"
                             " WHERE c.whatsapp_id = ANY(:ids) AND d.deleted_at IS NULL"
                             " ORDER BY d.position ASC, d.id ASC"
                         ),
@@ -262,12 +262,12 @@ async def test_backfill_first_open_only(settings):
     try:
         async with factory() as session:
             await session.execute(
-                text("INSERT INTO crm_pipelines (id, name) VALUES (:id, :name)"),
+                text("INSERT INTO tcs_crm_pipelines (id, name) VALUES (:id, :name)"),
                 {"id": pipeline_id, "name": f"Backfill Pipe {suffix}"},
             )
             await session.execute(
                 text(
-                    "INSERT INTO crm_stages (id, pipeline_id, name, sort, kind)"
+                    "INSERT INTO tcs_crm_stages (id, pipeline_id, name, sort, kind)"
                     " VALUES (:id, :p, 'First', 0, 'open'), (:work, :p, 'Working', 5, 'open')"
                 ),
                 {"id": first_id, "work": work_id, "p": pipeline_id},
@@ -275,7 +275,7 @@ async def test_backfill_first_open_only(settings):
             for n, cid in enumerate(contact_ids):
                 await session.execute(
                     text(
-                        "INSERT INTO crm_contacts (id, whatsapp_id, name)"
+                        "INSERT INTO tcs_crm_contacts (id, whatsapp_id, name)"
                         " VALUES (:id, :wa, :name)"
                     ),
                     {"id": cid, "wa": f"799944{n}{suffix}@c.us", "name": f"BF {n}"},
@@ -318,7 +318,7 @@ async def test_backfill_first_open_only(settings):
             for did, cid, sid, title, pos, created in deals:
                 await session.execute(
                     text(
-                        "INSERT INTO crm_deals"
+                        "INSERT INTO tcs_crm_deals"
                         " (id, contact_id, pipeline_id, stage_id, title, status,"
                         " position, created_at)"
                         " VALUES (:id, :c, :p, :s, :t, 'open', :pos, :created)"
@@ -344,7 +344,7 @@ async def test_backfill_first_open_only(settings):
                 (
                     await session.execute(
                         text(
-                            "SELECT title, position FROM crm_deals"
+                            "SELECT title, position FROM tcs_crm_deals"
                             " WHERE pipeline_id = :p AND deleted_at IS NULL"
                             " ORDER BY position ASC"
                         ),

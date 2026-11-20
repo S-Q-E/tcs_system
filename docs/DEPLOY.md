@@ -45,7 +45,7 @@ seed only, `DEMO_DB_CONFIRM=I_UNDERSTAND_THIS_IS_A_DEMO_DB` is required by
 ## Database and migrations
 
 - CRM tables (`crm_*`) are created only by Alembic; the version table is
-  `crm_alembic_version`.
+  `tcs_crm_alembic_version`.
 - Bot tables (`tcs_*`) belong to the bot/seed; migrations never create them.
   Backfills that read them are guarded with an existence check, so
   `alembic upgrade head` succeeds on a brand-new database.

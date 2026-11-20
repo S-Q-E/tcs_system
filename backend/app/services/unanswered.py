@@ -30,7 +30,7 @@ NOTIFY_WINDOW = timedelta(hours=24)
 async def threshold_minutes(session: AsyncSession) -> int:
     value = (
         await session.execute(
-            text("SELECT value FROM crm_settings WHERE key = :key"), {"key": SETTING_KEY}
+            text("SELECT value FROM tcs_crm_settings WHERE key = :key"), {"key": SETTING_KEY}
         )
     ).scalar_one_or_none()
     if isinstance(value, int) and not isinstance(value, bool):

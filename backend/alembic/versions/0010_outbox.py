@@ -28,14 +28,14 @@ _SEED_REPLIES = (
 
 def upgrade() -> None:
     op.create_table(
-        "crm_outbox",
+        "tcs_crm_outbox",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("whatsapp_id", sa.Text(), nullable=False, index=True),
         sa.Column("body", sa.Text(), nullable=False),
         sa.Column(
             "sent_by",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_users.id", ondelete="SET NULL"),
+            sa.ForeignKey("tcs_crm_users.id", ondelete="SET NULL"),
             nullable=True,
             index=True,
         ),
@@ -52,11 +52,13 @@ def upgrade() -> None:
             server_default=sa.func.now(),
         ),
         sa.Column("sent_at", sa.DateTime(timezone=True), nullable=True),
-        sa.CheckConstraint("status IN ('queued', 'sent', 'failed')", name="ck_crm_outbox_status"),
+        sa.CheckConstraint(
+            "status IN ('queued', 'sent', 'failed')", name="ck_tcs_crm_outbox_status"
+        ),
     )
-    op.create_index("ix_crm_outbox_due", "crm_outbox", ["status", "next_attempt_at"])
+    op.create_index("ix_tcs_crm_outbox_due", "tcs_crm_outbox", ["status", "next_attempt_at"])
     op.create_table(
-        "crm_quick_replies",
+        "tcs_crm_quick_replies",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("title", sa.String(255), nullable=False, unique=True),
         sa.Column("body", sa.Text(), nullable=False),
@@ -65,7 +67,7 @@ def upgrade() -> None:
     for title, body, sort in _SEED_REPLIES:
         op.execute(
             sa.text(
-                "INSERT INTO crm_quick_replies (id, title, body, sort)"
+                "INSERT INTO tcs_crm_quick_replies (id, title, body, sort)"
                 " VALUES (gen_random_uuid(), :title, :body, :sort)"
                 " ON CONFLICT (title) DO NOTHING"
             ).bindparams(title=title, body=body, sort=sort)
@@ -73,6 +75,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table("crm_quick_replies")
-    op.drop_index("ix_crm_outbox_due", table_name="crm_outbox")
-    op.drop_table("crm_outbox")
+    op.drop_table("tcs_crm_quick_replies")
+    op.drop_index("ix_tcs_crm_outbox_due", table_name="tcs_crm_outbox")
+    op.drop_table("tcs_crm_outbox")

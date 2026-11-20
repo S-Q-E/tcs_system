@@ -102,7 +102,7 @@ async def test_contact_filters_and_pagination(client, settings):
         assert by_custom.json()["total"] == 0
     finally:
         await purge_contacts(factory, contact_ids)
-        await purge_rows(factory, "crm_tags", tag_ids)
+        await purge_rows(factory, "tcs_crm_tags", tag_ids)
         await engine.dispose()
 
 
@@ -148,7 +148,7 @@ async def test_contact_custom_validation(client, settings):
         assert ok["custom"]["bot_extra"] == "kept"
     finally:
         await purge_contacts(factory, contact_ids)
-        await purge_rows(factory, "crm_custom_fields", field_ids)
+        await purge_rows(factory, "tcs_crm_custom_fields", field_ids)
         await engine.dispose()
 
 
@@ -201,7 +201,7 @@ async def test_contact_visibility_scope(client, settings, app):
         async with factory() as session:
             await session.execute(
                 text(
-                    "INSERT INTO crm_settings (key, value) VALUES"
+                    "INSERT INTO tcs_crm_settings (key, value) VALUES"
                     " ('restrict_managers_to_own', 'true')"
                     " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
                 )
@@ -222,7 +222,7 @@ async def test_contact_visibility_scope(client, settings, app):
         finally:
             async with factory() as session:
                 await session.execute(
-                    text("DELETE FROM crm_settings WHERE key = 'restrict_managers_to_own'")
+                    text("DELETE FROM tcs_crm_settings WHERE key = 'restrict_managers_to_own'")
                 )
                 await session.commit()
     finally:

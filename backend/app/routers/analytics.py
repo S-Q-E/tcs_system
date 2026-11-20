@@ -73,7 +73,7 @@ async def _ensure_analytics_visible(session: AsyncSession, user: CurrentUser) ->
         return
     value = (
         await session.execute(
-            text("SELECT value FROM crm_settings WHERE key = 'analytics_managers_visible'")
+            text("SELECT value FROM tcs_crm_settings WHERE key = 'analytics_managers_visible'")
         )
     ).scalar_one_or_none()
     if value is False:

@@ -62,7 +62,7 @@ async def test_deal_patch_unassign_owner(client, settings):
             assert cleared.status_code == 200, cleared.text
             assert cleared.json()["owner_id"] is None
         finally:
-            await purge_rows(factory, "crm_deals", [deal["id"]])
+            await purge_rows(factory, "tcs_crm_deals", [deal["id"]])
     finally:
         await purge_contacts(factory, contact_ids)
         await engine.dispose()
@@ -124,7 +124,7 @@ async def test_task_patch_unassign_assignee(client, settings):
         assert cleared.status_code == 200, cleared.text
         assert cleared.json()["assignee_id"] is None
     finally:
-        await purge_rows(factory, "crm_tasks", task_ids)
+        await purge_rows(factory, "tcs_crm_tasks", task_ids)
         await engine.dispose()
 
 
@@ -172,7 +172,7 @@ async def test_bulk_unassign_owner_flag(client, settings):
         assert bulk_tasks.status_code == 200, bulk_tasks.text
         assert (await client.get(f"/api/tasks/{task['id']}")).json()["assignee_id"] is None
     finally:
-        await purge_rows(factory, "crm_tasks", task_ids)
-        await purge_rows(factory, "crm_deals", deal_ids)
+        await purge_rows(factory, "tcs_crm_tasks", task_ids)
+        await purge_rows(factory, "tcs_crm_deals", deal_ids)
         await purge_contacts(factory, contact_ids)
         await engine.dispose()

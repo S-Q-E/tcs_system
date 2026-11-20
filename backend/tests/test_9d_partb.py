@@ -36,14 +36,16 @@ async def _insert_lead(factory, wa: str) -> None:
 
 async def _purge(factory, wa: str) -> None:
     async with factory() as session:
-        await session.execute(text("DELETE FROM crm_outbox WHERE whatsapp_id = :wa"), {"wa": wa})
+        await session.execute(
+            text("DELETE FROM tcs_crm_outbox WHERE whatsapp_id = :wa"), {"wa": wa}
+        )
         await session.execute(text("DELETE FROM tcs_messages WHERE whatsapp_id = :wa"), {"wa": wa})
         await session.execute(text("DELETE FROM tcs_events WHERE whatsapp_id = :wa"), {"wa": wa})
         await session.execute(text("DELETE FROM tcs_leads WHERE whatsapp_id = :wa"), {"wa": wa})
         # Failure paths notify the sender; drop those rows too so later
         # tests counting notifications (test_outbox.py) see a clean slate.
         await session.execute(
-            text("DELETE FROM crm_notifications WHERE payload ->> 'whatsapp_id' = :wa"),
+            text("DELETE FROM tcs_crm_notifications WHERE payload ->> 'whatsapp_id' = :wa"),
             {"wa": wa},
         )
         await session.commit()
@@ -158,7 +160,7 @@ async def test_outbox_failure_stores_short_class_only_error(client, settings):
             row = (
                 (
                     await session.execute(
-                        text("SELECT error FROM crm_outbox WHERE whatsapp_id = :wa"), {"wa": wa}
+                        text("SELECT error FROM tcs_crm_outbox WHERE whatsapp_id = :wa"), {"wa": wa}
                     )
                 )
                 .mappings()
@@ -199,7 +201,7 @@ async def test_outbox_mirror_failure_prefix_is_short(client, settings, monkeypat
             row = (
                 (
                     await session.execute(
-                        text("SELECT error FROM crm_outbox WHERE whatsapp_id = :wa"), {"wa": wa}
+                        text("SELECT error FROM tcs_crm_outbox WHERE whatsapp_id = :wa"), {"wa": wa}
                     )
                 )
                 .mappings()
@@ -228,7 +230,7 @@ async def test_analytics_managers_visible_setting(client, settings, app):
         async with factory() as session:
             await session.execute(
                 text(
-                    "INSERT INTO crm_settings (key, value) VALUES"
+                    "INSERT INTO tcs_crm_settings (key, value) VALUES"
                     " ('analytics_managers_visible', 'false')"
                     " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
                 )
@@ -248,7 +250,7 @@ async def test_analytics_managers_visible_setting(client, settings, app):
         finally:
             async with factory() as session:
                 await session.execute(
-                    text("DELETE FROM crm_settings WHERE key = 'analytics_managers_visible'")
+                    text("DELETE FROM tcs_crm_settings WHERE key = 'analytics_managers_visible'")
                 )
                 await session.commit()
     finally:
@@ -276,7 +278,7 @@ def test_n8n_workflow_and_readme_present():
     assert by_name["Check Duplicate"]["type"] == "n8n-nodes-base.postgres"
     assert by_name["Mark Sent"]["type"] == "n8n-nodes-base.postgres"
     assert "ON CONFLICT (outbox_id) DO NOTHING" in text_blob
-    assert "n8n_processed_outbox" in text_blob
+    assert "tcs_n8n_processed_outbox" in text_blob
     assert "SELECT COUNT(*)" in text_blob
     assert "n8n-nodes-base.telegram" in text_blob
     assert "continueErrorOutput" in text_blob
@@ -286,5 +288,5 @@ def test_n8n_workflow_and_readme_present():
     readme_text = readme.read_text()
     assert "crm-send-message" in readme_text
     assert "X-CRM-Secret" in readme_text
-    assert "n8n_processed_outbox" in readme_text
+    assert "tcs_n8n_processed_outbox" in readme_text
     assert "Telegram" in readme_text

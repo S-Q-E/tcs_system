@@ -130,7 +130,7 @@ async def _seed_fixed_dataset(client, factory, token: str, pipeline: dict) -> di
 
     async with factory() as session:
         await session.execute(
-            text("UPDATE crm_deals SET created_at = :at WHERE id = :id"),
+            text("UPDATE tcs_crm_deals SET created_at = :at WHERE id = :id"),
             [
                 {"at": _dt("2026-02-11 04:00"), "id": d1},
                 {"at": _dt("2026-02-11 06:00"), "id": d2},
@@ -139,7 +139,7 @@ async def _seed_fixed_dataset(client, factory, token: str, pipeline: dict) -> di
             ],
         )
         await session.execute(
-            text("UPDATE crm_contacts SET created_at = :at WHERE id = :id"),
+            text("UPDATE tcs_crm_contacts SET created_at = :at WHERE id = :id"),
             [
                 {"at": _dt("2026-02-11 03:30"), "id": c1},
                 {"at": _dt("2026-02-11 05:30"), "id": c2},
@@ -148,20 +148,20 @@ async def _seed_fixed_dataset(client, factory, token: str, pipeline: dict) -> di
             ],
         )
         await session.execute(
-            text("UPDATE crm_deals SET trial_at = :at, closed_at = :closed WHERE id = :id"),
+            text("UPDATE tcs_crm_deals SET trial_at = :at, closed_at = :closed WHERE id = :id"),
             {"at": _dt("2026-02-12 04:00"), "closed": _dt("2026-02-13 05:00"), "id": d1},
         )
         await session.execute(
-            text("UPDATE crm_deals SET closed_at = :closed, stage_id = :stage WHERE id = :id"),
+            text("UPDATE tcs_crm_deals SET closed_at = :closed, stage_id = :stage WHERE id = :id"),
             {"closed": _dt("2026-02-14 03:00"), "stage": s2["id"], "id": d3},
         )
         await session.execute(
-            text("UPDATE crm_deals SET stage_id = :stage WHERE id = :id"),
+            text("UPDATE tcs_crm_deals SET stage_id = :stage WHERE id = :id"),
             {"stage": s2["id"], "id": d4},
         )
         # Exact stage history; d4 keeps none (fallback branch).
         await session.execute(
-            text("DELETE FROM crm_deal_stage_history WHERE deal_id = ANY(:ids)"),
+            text("DELETE FROM tcs_crm_deal_stage_history WHERE deal_id = ANY(:ids)"),
             {"ids": [d1, d2, d3, d4]},
         )
         for deal_id, from_id, to_id, at in (
@@ -173,7 +173,7 @@ async def _seed_fixed_dataset(client, factory, token: str, pipeline: dict) -> di
         ):
             await session.execute(
                 text(
-                    "INSERT INTO crm_deal_stage_history"
+                    "INSERT INTO tcs_crm_deal_stage_history"
                     " (id, deal_id, from_stage_id, to_stage_id, source, at)"
                     " VALUES (:id, :deal, :from, :to, 'manager', :at)"
                 ),
@@ -186,7 +186,7 @@ async def _seed_fixed_dataset(client, factory, token: str, pipeline: dict) -> di
                 },
             )
         await session.execute(
-            text("UPDATE crm_tasks SET done_at = :at WHERE id = :id"),
+            text("UPDATE tcs_crm_tasks SET done_at = :at WHERE id = :id"),
             {"at": _dt("2026-02-15 05:00"), "id": t1["id"]},
         )
         for wa, stage, status, objection, created in (
@@ -344,9 +344,9 @@ async def test_overview_matches_hand_computed_values(client, settings):
         assert tags[seed["tag"]["name"]]["won"] == 1
     finally:
         await purge_contacts(factory, contact_ids)
-        await purge_rows(factory, "crm_tasks", extra_ids["tasks"])
-        await purge_rows(factory, "crm_tags", extra_ids["tags"])
-        await purge_rows(factory, "crm_lost_reasons", extra_ids["reasons"])
+        await purge_rows(factory, "tcs_crm_tasks", extra_ids["tasks"])
+        await purge_rows(factory, "tcs_crm_tags", extra_ids["tags"])
+        await purge_rows(factory, "tcs_crm_lost_reasons", extra_ids["reasons"])
         await engine.dispose()
 
 
@@ -402,7 +402,8 @@ async def test_empty_period_and_deals_without_history(client, settings):
         deal = await create_deal(client, token, contact["id"], pipeline)
         async with factory() as session:
             await session.execute(
-                text("DELETE FROM crm_deal_stage_history WHERE deal_id = :id"), {"id": deal["id"]}
+                text("DELETE FROM tcs_crm_deal_stage_history WHERE deal_id = :id"),
+                {"id": deal["id"]},
             )
             await session.commit()
 
@@ -447,9 +448,9 @@ async def test_owner_filter_and_weekly_granularity(client, settings):
             ]
             assert sum(b["new_leads"] for b in weekly["summary"]["dynamics"]) == 4
         finally:
-            await purge_rows(factory, "crm_tasks", seed["tasks"])
-            await purge_rows(factory, "crm_tags", [seed["tag"]["id"]])
-            await purge_rows(factory, "crm_lost_reasons", [seed["reason"]["id"]])
+            await purge_rows(factory, "tcs_crm_tasks", seed["tasks"])
+            await purge_rows(factory, "tcs_crm_tags", [seed["tag"]["id"]])
+            await purge_rows(factory, "tcs_crm_lost_reasons", [seed["reason"]["id"]])
     finally:
         await purge_contacts(factory, contact_ids)
         await engine.dispose()
@@ -500,7 +501,7 @@ async def test_validation_auth_and_export(client, settings, app):
             async with factory() as session:
                 await session.execute(
                     text(
-                        "INSERT INTO crm_settings (key, value) VALUES"
+                        "INSERT INTO tcs_crm_settings (key, value) VALUES"
                         " ('restrict_managers_to_own', 'true')"
                         " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
                     )
@@ -519,13 +520,13 @@ async def test_validation_auth_and_export(client, settings, app):
             finally:
                 async with factory() as session:
                     await session.execute(
-                        text("DELETE FROM crm_settings WHERE key = 'restrict_managers_to_own'")
+                        text("DELETE FROM tcs_crm_settings WHERE key = 'restrict_managers_to_own'")
                     )
                     await session.commit()
         finally:
-            await purge_rows(factory, "crm_tasks", seed["tasks"])
-            await purge_rows(factory, "crm_tags", [seed["tag"]["id"]])
-            await purge_rows(factory, "crm_lost_reasons", [seed["reason"]["id"]])
+            await purge_rows(factory, "tcs_crm_tasks", seed["tasks"])
+            await purge_rows(factory, "tcs_crm_tags", [seed["tag"]["id"]])
+            await purge_rows(factory, "tcs_crm_lost_reasons", [seed["reason"]["id"]])
     finally:
         await purge_contacts(factory, contact_ids)
         await engine.dispose()

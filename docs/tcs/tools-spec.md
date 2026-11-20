@@ -6,7 +6,7 @@ version (node type availability, expression scope) is marked **MANUAL** in
 `HUMAN_TODO.md` and must be re-checked in the n8n UI after import.
 
 All SQL below uses the demo tables: `tcs_leads`, `tcs_units`, `tcs_events`,
-`crm_conversation_state`. `whatsapp_id` is always `tg:<chat_id>`.
+`tcs_crm_conversation_state`. `whatsapp_id` is always `tg:<chat_id>`.
 
 ## 1. search_units (Postgres tool)
 

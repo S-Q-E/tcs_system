@@ -13,30 +13,30 @@ from .base import Base
 class CrmNote(Base):
     """Note attached to a deal and/or a contact."""
 
-    __tablename__ = "crm_notes"
+    __tablename__ = "tcs_crm_notes"
     __table_args__ = (
         CheckConstraint(
             "deal_id IS NOT NULL OR contact_id IS NOT NULL",
-            name="ck_crm_notes_target",
+            name="ck_tcs_crm_notes_target",
         ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     deal_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("crm_deals.id", ondelete="CASCADE"),
+        ForeignKey("tcs_crm_deals.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
     contact_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("crm_contacts.id", ondelete="CASCADE"),
+        ForeignKey("tcs_crm_contacts.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
     author_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("crm_users.id", ondelete="SET NULL"),
+        ForeignKey("tcs_crm_users.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )

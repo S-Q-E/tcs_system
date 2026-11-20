@@ -12,9 +12,9 @@ Tables used by the CRM: `tcs_leads`, `tcs_messages`, `tcs_events`,
 `tcs_followups`, `tcs_units` (read-only catalog for the bot).
 CRM tables live in the same database under the `crm_` prefix and are created
 only by Alembic (see `backend/alembic/versions`, version table
-`crm_alembic_version`).
-n8n-owned helper tables: `n8n_chat_histories` (agent memory) and
-`n8n_processed_outbox` (dedupe for CRM → Telegram sends).
+`tcs_crm_alembic_version`).
+n8n-owned helper tables: `tcs_n8n_chat_histories` (agent memory) and
+`tcs_n8n_processed_outbox` (dedupe for CRM → Telegram sends).
 Other bot tables (not used by the CRM): `tcs_ai_metrics`,
 `tcs_chat_history`, `bot_*`, `chat_status`, `reminders`, `Reminderai`, views
 `tcs_*`.

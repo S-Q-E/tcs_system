@@ -16,7 +16,7 @@ P2 = product growth.
   The reference workflow already shows this pattern with Telegram; port it to
   Telegram. Reason: right now a broken bot fails silently for the client.
 - [ ] **Heartbeat / dead-man switch.** A tiny workflow every 15 minutes writes
-  a timestamp to `crm_settings` (e.g. `n8n_heartbeat`); the CRM shows a banner
+  a timestamp to `tcs_crm_settings` (e.g. `n8n_heartbeat`); the CRM shows a banner
   when the bot has not checked in for 30+ minutes. Covers paused/deleted
   workflows and webhook problems.
 - [ ] **Outbox dead-letter alert.** CRM already marks a send `failed`; add a

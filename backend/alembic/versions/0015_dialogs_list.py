@@ -13,15 +13,15 @@ depends_on = None
 
 def upgrade() -> None:
     op.add_column(
-        "crm_conversation_state",
+        "tcs_crm_conversation_state",
         sa.Column("last_message_at", sa.DateTime(timezone=True), nullable=True),
     )
     op.add_column(
-        "crm_conversation_state",
+        "tcs_crm_conversation_state",
         sa.Column("last_message_direction", sa.Text(), nullable=True),
     )
     op.add_column(
-        "crm_conversation_state",
+        "tcs_crm_conversation_state",
         sa.Column("last_message_preview", sa.Text(), nullable=True),
     )
     # tcs_* tables are owned by the bot and may be absent (fresh database):
@@ -31,7 +31,7 @@ def upgrade() -> None:
             "DO $$ BEGIN "
             "IF EXISTS (SELECT 1 FROM information_schema.tables "
             "WHERE table_name = 'tcs_messages') THEN "
-            "UPDATE crm_conversation_state s SET"
+            "UPDATE tcs_crm_conversation_state s SET"
             " last_message_at = m.created_at,"
             " last_message_direction = m.direction,"
             " last_message_preview = LEFT(m.content, 200)"
@@ -45,6 +45,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_column("crm_conversation_state", "last_message_preview")
-    op.drop_column("crm_conversation_state", "last_message_direction")
-    op.drop_column("crm_conversation_state", "last_message_at")
+    op.drop_column("tcs_crm_conversation_state", "last_message_preview")
+    op.drop_column("tcs_crm_conversation_state", "last_message_direction")
+    op.drop_column("tcs_crm_conversation_state", "last_message_at")

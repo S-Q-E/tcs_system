@@ -62,7 +62,7 @@ BOT_TABLES_CONTRACT: dict[str, set[str]] = {
     },
 }
 
-# Types CRM relies on: crm_outbox.tcs_message_id is BigInteger, and the
+# Types CRM relies on: tcs_crm_outbox.tcs_message_id is BigInteger, and the
 # realtime poller compares ids as integers.
 KEY_TYPES = {
     ("tcs_messages", "id"): "bigint",
@@ -70,7 +70,9 @@ KEY_TYPES = {
     ("tcs_leads", "id"): "integer",
 }
 
-_SQL_TARGET = re.compile(r"\b(?:FROM|INTO|UPDATE|JOIN)\s+(tcs_[a-z_]+)", re.IGNORECASE)
+# tcs_crm_* tables are owned by CRM (Alembic); the contract covers the
+# n8n-owned tcs_* tables only.
+_SQL_TARGET = re.compile(r"\b(?:FROM|INTO|UPDATE|JOIN)\s+(tcs_(?!crm_)[a-z_]+)", re.IGNORECASE)
 
 
 def _code_tcs_tables() -> set[str]:
@@ -137,11 +139,13 @@ async def test_whatsapp_id_is_unique_for_leads(settings):
 
 
 async def test_tcs_tables_have_no_foreign_keys(settings):
-    # Production has no FKs between tcs_* tables (rows match by whatsapp_id);
-    # test cleanup relies on explicit deletes because of this.
+    # Production has no FKs between n8n-owned tcs_* tables (rows match by
+    # whatsapp_id); test cleanup relies on explicit deletes because of this.
+    # tcs_crm_* tables are CRM-owned and do have FKs.
     rows = await _fetch(
         settings,
         "SELECT conrelid::regclass::text FROM pg_constraint"
-        " WHERE contype = 'f' AND conrelid::regclass::text LIKE 'tcs\\_%'",
+        " WHERE contype = 'f' AND conrelid::regclass::text LIKE 'tcs\\_%'"
+        " AND conrelid::regclass::text NOT LIKE 'tcs\\_crm\\_%'",
     )
     assert rows == []

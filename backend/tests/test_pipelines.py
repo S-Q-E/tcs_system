@@ -264,7 +264,7 @@ async def test_delete_stage_counts_and_moves_soft_deleted_deals(client, settings
         async with factory() as session:
             stage_now = (
                 await session.execute(
-                    text("SELECT stage_id::text FROM crm_deals WHERE id = :id"),
+                    text("SELECT stage_id::text FROM tcs_crm_deals WHERE id = :id"),
                     {"id": deal["id"]},
                 )
             ).scalar_one()

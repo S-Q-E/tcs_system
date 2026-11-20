@@ -14,26 +14,26 @@ depends_on = None
 
 def upgrade() -> None:
     op.create_table(
-        "crm_notes",
+        "tcs_crm_notes",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column(
             "deal_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_deals.id", ondelete="CASCADE"),
+            sa.ForeignKey("tcs_crm_deals.id", ondelete="CASCADE"),
             nullable=True,
             index=True,
         ),
         sa.Column(
             "contact_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_contacts.id", ondelete="CASCADE"),
+            sa.ForeignKey("tcs_crm_contacts.id", ondelete="CASCADE"),
             nullable=True,
             index=True,
         ),
         sa.Column(
             "author_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_users.id", ondelete="SET NULL"),
+            sa.ForeignKey("tcs_crm_users.id", ondelete="SET NULL"),
             nullable=True,
             index=True,
         ),
@@ -47,11 +47,11 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint(
             "deal_id IS NOT NULL OR contact_id IS NOT NULL",
-            name="ck_crm_notes_target",
+            name="ck_tcs_crm_notes_target",
         ),
     )
     op.alter_column(
-        "crm_deals",
+        "tcs_crm_deals",
         "position",
         existing_type=sa.Integer(),
         type_=sa.Numeric(20, 10),
@@ -63,7 +63,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.alter_column(
-        "crm_deals",
+        "tcs_crm_deals",
         "position",
         existing_type=sa.Numeric(20, 10),
         type_=sa.Integer(),
@@ -71,4 +71,4 @@ def downgrade() -> None:
         existing_server_default="0",
         postgresql_using="position::integer",
     )
-    op.drop_table("crm_notes")
+    op.drop_table("tcs_crm_notes")

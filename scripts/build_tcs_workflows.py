@@ -199,7 +199,7 @@ def build_send_message() -> dict:
             {
                 "operation": "executeQuery",
                 "query": "SELECT COUNT(*) AS seen, MAX(provider_message_id) AS provider_message_id"
-                " FROM n8n_processed_outbox WHERE outbox_id = $1::uuid",
+                " FROM tcs_n8n_processed_outbox WHERE outbox_id = $1::uuid",
                 "options": {"queryReplacement": "={{ $json.body.outbox_id }}"},
             },
             credentials=POSTGRES_CREDS,
@@ -265,7 +265,7 @@ def build_send_message() -> dict:
             [496, 336],
             {
                 "operation": "executeQuery",
-                "query": "INSERT INTO n8n_processed_outbox (outbox_id, provider_message_id)"
+                "query": "INSERT INTO tcs_n8n_processed_outbox (outbox_id, provider_message_id)"
                 " VALUES ($1::uuid, NULL) ON CONFLICT (outbox_id) DO NOTHING",
                 "options": {
                     "queryReplacement": "={{ $('CRM Send Webhook').item.json.body.outbox_id }}"
@@ -301,7 +301,7 @@ def build_send_message() -> dict:
             "## TCS Send Message (Telegram)\n"
             "1. Import: Workflows -> Import from file. Attach credentials in the UI: "
             "`Postgres account`, `Telegram account` (the demo bot).\n"
-            "2. `n8n_processed_outbox` comes from docs/n8n/README.md.\n"
+            "2. `tcs_n8n_processed_outbox` comes from docs/n8n/README.md.\n"
             "3. Env `N8N_WEBHOOK_SECRET` in n8n = CRM `N8N_WEBHOOK_SECRET`.\n"
             "4. Telegram has no `success` field: success output -> Mark Sent -> Respond OK; "
             "error output -> Respond Error (502). Dedupe is written only after a successful send.\n"
@@ -532,7 +532,7 @@ whatsapp_id: {{ $('Upsert & Load Lead State').item.json.whatsapp_id }}
             [660, 300],
             {
                 "operation": "executeQuery",
-                "query": "SELECT COALESCE((SELECT bot_paused FROM crm_conversation_state"
+                "query": "SELECT COALESCE((SELECT bot_paused FROM tcs_crm_conversation_state"
                 " WHERE whatsapp_id = $1), false) AS bot_paused;",
                 "options": {
                     "queryReplacement": "={{ [ $('Normalize Message').item.json.whatsapp_id ] }}"
@@ -1006,7 +1006,7 @@ whatsapp_id: {{ $('Upsert & Load Lead State').item.json.whatsapp_id }}
             "3. Schema and demo data come from scripts/seed_tcs_demo.py; do not run"
             " schema nodes here.\n"
             "4. The bot writes tcs_leads / tcs_messages / tcs_events; the CRM reads them.\n"
-            "5. Bot paused = crm_conversation_state.bot_paused; a manager reply pauses"
+            "5. Bot paused = tcs_crm_conversation_state.bot_paused; a manager reply pauses"
             " the bot automatically in the CRM.",
             [-220, 80],
         )
@@ -1093,7 +1093,7 @@ WHERE l.trial_datetime > now()
   AND COALESCE(l.reminder_sent, false) = false
   AND l.whatsapp_id LIKE 'tg:%'
   AND NOT EXISTS (
-    SELECT 1 FROM crm_conversation_state s
+    SELECT 1 FROM tcs_crm_conversation_state s
     WHERE s.whatsapp_id = l.whatsapp_id AND s.bot_paused = true
   )
 ORDER BY l.trial_datetime;

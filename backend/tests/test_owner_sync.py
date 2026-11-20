@@ -27,39 +27,39 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 MIGRATION_SQL = (
     "WITH managed AS ("
     " SELECT DISTINCT ON (d.contact_id) d.id AS deal_id, d.contact_id"
-    " FROM crm_deals d"
+    " FROM tcs_crm_deals d"
     " WHERE d.deleted_at IS NULL"
     " ORDER BY d.contact_id, d.updated_at DESC, d.id"
     ")"
-    " UPDATE crm_deals d"
+    " UPDATE tcs_crm_deals d"
     " SET owner_id = COALESCE(s.assigned_to, c.owner_id)"
     " FROM managed m"
-    " JOIN crm_contacts c ON c.id = m.contact_id"
-    " LEFT JOIN crm_conversation_state s ON s.whatsapp_id = c.whatsapp_id"
+    " JOIN tcs_crm_contacts c ON c.id = m.contact_id"
+    " LEFT JOIN tcs_crm_conversation_state s ON s.whatsapp_id = c.whatsapp_id"
     " WHERE d.id = m.deal_id"
     " AND d.owner_id IS NULL"
     " AND COALESCE(s.assigned_to, c.owner_id) IS NOT NULL",
     "WITH managed AS ("
     " SELECT DISTINCT ON (d.contact_id) d.contact_id, d.owner_id"
-    " FROM crm_deals d"
+    " FROM tcs_crm_deals d"
     " WHERE d.deleted_at IS NULL"
     " ORDER BY d.contact_id, d.updated_at DESC, d.id"
     ")"
-    " UPDATE crm_contacts c"
+    " UPDATE tcs_crm_contacts c"
     " SET owner_id = m.owner_id"
     " FROM managed m"
     " WHERE m.contact_id = c.id AND m.owner_id IS NOT NULL"
     " AND c.owner_id IS DISTINCT FROM m.owner_id",
     "WITH managed AS ("
     " SELECT DISTINCT ON (d.contact_id) d.contact_id, d.owner_id"
-    " FROM crm_deals d"
+    " FROM tcs_crm_deals d"
     " WHERE d.deleted_at IS NULL"
     " ORDER BY d.contact_id, d.updated_at DESC, d.id"
     ")"
-    " UPDATE crm_conversation_state s"
+    " UPDATE tcs_crm_conversation_state s"
     " SET assigned_to = m.owner_id"
     " FROM managed m"
-    " JOIN crm_contacts c ON c.id = m.contact_id"
+    " JOIN tcs_crm_contacts c ON c.id = m.contact_id"
     " WHERE s.whatsapp_id = c.whatsapp_id AND m.owner_id IS NOT NULL"
     " AND s.assigned_to IS DISTINCT FROM m.owner_id",
 )
@@ -85,14 +85,14 @@ async def _owners(factory, contact_id: str, wa: str) -> dict:
     async with factory() as session:
         contact_owner = (
             await session.execute(
-                text("SELECT owner_id FROM crm_contacts WHERE id = :id"),
+                text("SELECT owner_id FROM tcs_crm_contacts WHERE id = :id"),
                 {"id": contact_id},
             )
         ).scalar_one()
         deal_owner = (
             await session.execute(
                 text(
-                    "SELECT owner_id FROM crm_deals"
+                    "SELECT owner_id FROM tcs_crm_deals"
                     " WHERE contact_id = :id AND deleted_at IS NULL"
                     " ORDER BY updated_at DESC, id LIMIT 1"
                 ),
@@ -101,7 +101,7 @@ async def _owners(factory, contact_id: str, wa: str) -> dict:
         ).scalar_one_or_none()
         state = (
             await session.execute(
-                text("SELECT assigned_to FROM crm_conversation_state WHERE whatsapp_id = :wa"),
+                text("SELECT assigned_to FROM tcs_crm_conversation_state WHERE whatsapp_id = :wa"),
                 {"wa": wa},
             )
         ).one_or_none()
@@ -337,7 +337,7 @@ async def test_migration_aligns_old_owners(client, settings):
                 contact_ids.append(contact_id)
                 await session.execute(
                     text(
-                        "INSERT INTO crm_contacts (id, whatsapp_id, name)"
+                        "INSERT INTO tcs_crm_contacts (id, whatsapp_id, name)"
                         " VALUES (:id, :wa, 'Old owner')"
                     ),
                     {"id": contact_id, "wa": wa},
@@ -346,7 +346,7 @@ async def test_migration_aligns_old_owners(client, settings):
                 if n < 2:
                     await session.execute(
                         text(
-                            "INSERT INTO crm_deals"
+                            "INSERT INTO tcs_crm_deals"
                             " (id, contact_id, pipeline_id, stage_id, title, status, position)"
                             " VALUES (:id, :c, :p, :s, 'Old owner deal', 'open', 0)"
                         ),
@@ -363,30 +363,30 @@ async def test_migration_aligns_old_owners(client, settings):
             # 1: no owners anywhere except the dialog -> deal borrows it.
             await session.execute(
                 text(
-                    "INSERT INTO crm_conversation_state (whatsapp_id, assigned_to)"
+                    "INSERT INTO tcs_crm_conversation_state (whatsapp_id, assigned_to)"
                     " VALUES (:wa, :owner)"
                 ),
                 {"wa": rows[0][2], "owner": first["user"]["id"]},
             )
             # 2: deal owns second, contact and dialog still point at first.
             await session.execute(
-                text("UPDATE crm_deals SET owner_id = :owner WHERE id = :id"),
+                text("UPDATE tcs_crm_deals SET owner_id = :owner WHERE id = :id"),
                 {"id": rows[1][1], "owner": second["user"]["id"]},
             )
             await session.execute(
-                text("UPDATE crm_contacts SET owner_id = :owner WHERE id = :id"),
+                text("UPDATE tcs_crm_contacts SET owner_id = :owner WHERE id = :id"),
                 {"id": rows[1][0], "owner": first["user"]["id"]},
             )
             await session.execute(
                 text(
-                    "INSERT INTO crm_conversation_state (whatsapp_id, assigned_to)"
+                    "INSERT INTO tcs_crm_conversation_state (whatsapp_id, assigned_to)"
                     " VALUES (:wa, :owner)"
                 ),
                 {"wa": rows[1][2], "owner": first["user"]["id"]},
             )
             # 3: contact owner without a deal stays untouched.
             await session.execute(
-                text("UPDATE crm_contacts SET owner_id = :owner WHERE id = :id"),
+                text("UPDATE tcs_crm_contacts SET owner_id = :owner WHERE id = :id"),
                 {"id": rows[2][0], "owner": second["user"]["id"]},
             )
             await session.commit()

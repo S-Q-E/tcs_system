@@ -21,7 +21,7 @@ pytestmark = pytest.mark.usefixtures("db_available")
 async def _purge_attempts(factory, *emails: str) -> None:
     async with factory() as session:
         await session.execute(
-            text("DELETE FROM crm_login_attempts WHERE email = ANY(:emails)"),
+            text("DELETE FROM tcs_crm_login_attempts WHERE email = ANY(:emails)"),
             {"emails": list(emails)},
         )
         await session.commit()
@@ -221,7 +221,7 @@ async def test_login_limit_shared_between_workers(settings):
         engine = create_async_engine(settings.sqlalchemy_url, connect_args=settings.connect_args)
         async with engine.connect() as conn:
             await conn.execute(
-                text("DELETE FROM crm_login_attempts WHERE email = :email"),
+                text("DELETE FROM tcs_crm_login_attempts WHERE email = :email"),
                 {"email": email},
             )
             await conn.commit()
@@ -251,7 +251,7 @@ def test_sentry_scrub_removes_bodies_and_sql_params():
                 {
                     "type": "query",
                     "data": {
-                        "sql": "SELECT * FROM crm_users WHERE email = %(email)s",
+                        "sql": "SELECT * FROM tcs_crm_users WHERE email = %(email)s",
                         "params": {"email": "a@example.com"},
                     },
                 },
@@ -263,7 +263,7 @@ def test_sentry_scrub_removes_bodies_and_sql_params():
     assert "data" not in out["request"]
     assert out["request"]["method"] == "POST"
     assert out["breadcrumbs"]["values"][0]["data"] == {
-        "sql": "SELECT * FROM crm_users WHERE email = %(email)s"
+        "sql": "SELECT * FROM tcs_crm_users WHERE email = %(email)s"
     }
     assert out["breadcrumbs"]["values"][1]["data"]["status_code"] == 200
     assert scrub_sentry_event({}, None) == {}

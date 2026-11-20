@@ -14,12 +14,12 @@ depends_on = None
 
 def upgrade() -> None:
     op.create_table(
-        "crm_saved_views",
+        "tcs_crm_saved_views",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column(
             "user_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("crm_users.id", ondelete="SET NULL"),
+            sa.ForeignKey("tcs_crm_users.id", ondelete="SET NULL"),
             nullable=True,
             index=True,
         ),
@@ -33,9 +33,9 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.func.now(),
         ),
-        sa.CheckConstraint("entity IN ('deal', 'contact')", name="ck_crm_saved_views_entity"),
+        sa.CheckConstraint("entity IN ('deal', 'contact')", name="ck_tcs_crm_saved_views_entity"),
     )
 
 
 def downgrade() -> None:
-    op.drop_table("crm_saved_views")
+    op.drop_table("tcs_crm_saved_views")

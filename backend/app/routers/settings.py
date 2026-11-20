@@ -43,7 +43,9 @@ SETTING_ANALYTICS_MANAGERS = "analytics_managers_visible"
 
 async def _read_bool(session: AsyncSession, key: str, default: bool) -> bool:
     value = (
-        await session.execute(text("SELECT value FROM crm_settings WHERE key = :key"), {"key": key})
+        await session.execute(
+            text("SELECT value FROM tcs_crm_settings WHERE key = :key"), {"key": key}
+        )
     ).scalar_one_or_none()
     if value is None:
         return default
@@ -53,7 +55,7 @@ async def _read_bool(session: AsyncSession, key: str, default: bool) -> bool:
 async def _write_setting(session: AsyncSession, key: str, value: object) -> None:
     await session.execute(
         text(
-            "INSERT INTO crm_settings (key, value) VALUES (:key, CAST(:value AS jsonb))"
+            "INSERT INTO tcs_crm_settings (key, value) VALUES (:key, CAST(:value AS jsonb))"
             " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
         ),
         {"key": key, "value": json.dumps(value)},
@@ -108,7 +110,7 @@ async def update_settings(
             raise ApiError("UNKNOWN_MODE", "Unknown assignment mode", 422)
         row = (
             await session.execute(
-                text("SELECT value FROM crm_settings WHERE key = :key"),
+                text("SELECT value FROM tcs_crm_settings WHERE key = :key"),
                 {"key": SETTING_ASSIGNMENT},
             )
         ).scalar_one_or_none()
@@ -185,7 +187,7 @@ async def integrations_status(
         out.events_count = int(events)
 
     counts = (
-        (await session.execute(text("SELECT status, COUNT(*) FROM crm_outbox GROUP BY status")))
+        (await session.execute(text("SELECT status, COUNT(*) FROM tcs_crm_outbox GROUP BY status")))
         .mappings()
         .all()
     )
@@ -198,7 +200,7 @@ async def integrations_status(
         (
             await session.execute(
                 text(
-                    "SELECT id, whatsapp_id, error, attempts, created_at FROM crm_outbox"
+                    "SELECT id, whatsapp_id, error, attempts, created_at FROM tcs_crm_outbox"
                     " WHERE status = 'failed' ORDER BY created_at DESC LIMIT 1"
                 )
             )

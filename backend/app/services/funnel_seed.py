@@ -40,14 +40,14 @@ def seed_default_funnel(conn) -> uuid.UUID:
     Returns the default pipeline id.
     """
     pipeline_id = conn.execute(
-        text("SELECT id FROM crm_pipelines WHERE name = :name"),
+        text("SELECT id FROM tcs_crm_pipelines WHERE name = :name"),
         {"name": DEFAULT_PIPELINE_NAME},
     ).scalar_one_or_none()
     if pipeline_id is None:
         pipeline_id = uuid.uuid4()
         conn.execute(
             text(
-                "INSERT INTO crm_pipelines (id, name, is_default, sort)"
+                "INSERT INTO tcs_crm_pipelines (id, name, is_default, sort)"
                 " VALUES (:id, :name, TRUE, 0)"
             ),
             {"id": str(pipeline_id), "name": DEFAULT_PIPELINE_NAME},
@@ -55,13 +55,15 @@ def seed_default_funnel(conn) -> uuid.UUID:
 
     for sort, (name, color, kind, stage_key, status_key) in enumerate(STAGES):
         exists = conn.execute(
-            text("SELECT id FROM crm_stages" " WHERE pipeline_id = :pipeline_id AND name = :name"),
+            text(
+                "SELECT id FROM tcs_crm_stages" " WHERE pipeline_id = :pipeline_id AND name = :name"
+            ),
             {"pipeline_id": str(pipeline_id), "name": name},
         ).scalar_one_or_none()
         if exists is None:
             conn.execute(
                 text(
-                    "INSERT INTO crm_stages"
+                    "INSERT INTO tcs_crm_stages"
                     " (id, pipeline_id, name, color, sort, kind, bot_stage_key, bot_status_key)"
                     " VALUES (:id, :pipeline_id, :name, :color, :sort,"
                     " :kind, :stage_key, :status_key)"
@@ -80,11 +82,14 @@ def seed_default_funnel(conn) -> uuid.UUID:
 
     for sort, name in enumerate(LOST_REASONS):
         exists = conn.execute(
-            text("SELECT id FROM crm_lost_reasons WHERE name = :name"), {"name": name}
+            text("SELECT id FROM tcs_crm_lost_reasons WHERE name = :name"), {"name": name}
         ).scalar_one_or_none()
         if exists is None:
             conn.execute(
-                text("INSERT INTO crm_lost_reasons (id, name, sort)" " VALUES (:id, :name, :sort)"),
+                text(
+                    "INSERT INTO tcs_crm_lost_reasons (id, name, sort)"
+                    " VALUES (:id, :name, :sort)"
+                ),
                 {"id": str(uuid.uuid4()), "name": name, "sort": sort},
             )
     return pipeline_id

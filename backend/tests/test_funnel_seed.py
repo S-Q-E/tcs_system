@@ -42,12 +42,12 @@ async def test_fresh_db_has_one_six_stage_pipeline(settings):
 
         conn = await asyncpg.connect(dsn)
         try:
-            pipelines = await conn.fetch("SELECT name, is_default FROM crm_pipelines")
+            pipelines = await conn.fetch("SELECT name, is_default FROM tcs_crm_pipelines")
             stages = await conn.fetch(
                 "SELECT name, color, kind, bot_stage_key, bot_status_key"
-                " FROM crm_stages ORDER BY sort"
+                " FROM tcs_crm_stages ORDER BY sort"
             )
-            reasons = await conn.fetchval("SELECT COUNT(*) FROM crm_lost_reasons")
+            reasons = await conn.fetchval("SELECT COUNT(*) FROM tcs_crm_lost_reasons")
         finally:
             await conn.close()
     finally:

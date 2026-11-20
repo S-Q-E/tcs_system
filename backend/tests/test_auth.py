@@ -268,5 +268,5 @@ async def test_bootstrap_rejects_short_password(tx_session):
         pass
     else:
         raise AssertionError("short ADMIN_PASSWORD must raise ValueError")
-    count = (await tx_session.execute(text("SELECT COUNT(*) FROM crm_users"))).scalar()
+    count = (await tx_session.execute(text("SELECT COUNT(*) FROM tcs_crm_users"))).scalar()
     assert count == 0

@@ -130,7 +130,7 @@ async def test_tags_crud_and_permissions(client, settings, app):
         assert gone.json()["ok"] is True
         tag_ids.remove(tag["id"])
     finally:
-        await purge_rows(factory, "crm_tags", tag_ids)
+        await purge_rows(factory, "tcs_crm_tags", tag_ids)
         await engine.dispose()
 
 
@@ -181,7 +181,7 @@ async def test_custom_fields_admin_only_and_validation(client, settings, app):
             visible = await mgr.client.get("/api/custom-fields?entity=deal")
             assert any(f["key"] == "channel" for f in visible.json()["items"])
     finally:
-        await purge_rows(factory, "crm_custom_fields", field_ids)
+        await purge_rows(factory, "tcs_crm_custom_fields", field_ids)
         await engine.dispose()
 
 
@@ -229,5 +229,5 @@ async def test_lost_reasons_crud_and_in_use(client, settings, app):
         assert in_use.status_code == 409
     finally:
         await purge_contacts(factory, contact_ids)
-        await purge_rows(factory, "crm_lost_reasons", reason_ids)
+        await purge_rows(factory, "tcs_crm_lost_reasons", reason_ids)
         await engine.dispose()

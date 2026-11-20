@@ -164,14 +164,14 @@ async def schema_error(conn: asyncpg.Connection) -> str | None:
 
 async def pipeline_error(conn: asyncpg.Connection) -> str | None:
     """The pipeline must already exist (Alembic seeds it). Never create it here."""
-    row = await conn.fetchrow("SELECT id FROM crm_pipelines WHERE name = $1", PIPELINE_NAME)
+    row = await conn.fetchrow("SELECT id FROM tcs_crm_pipelines WHERE name = $1", PIPELINE_NAME)
     if row is None:
         return (
             f"Pipeline '{PIPELINE_NAME}' not found. Run "
             "`alembic upgrade head` first; this script never creates a pipeline."
         )
     stages = await conn.fetch(
-        "SELECT name, kind, bot_stage_key, bot_status_key FROM crm_stages"
+        "SELECT name, kind, bot_stage_key, bot_status_key FROM tcs_crm_stages"
         " WHERE pipeline_id = $1 ORDER BY sort",
         row["id"],
     )
@@ -256,7 +256,7 @@ async def seed_units(conn: asyncpg.Connection) -> int:
 async def seed_settings(conn: asyncpg.Connection) -> None:
     """unanswered_after_minutes = 2 (JSON number)."""
     await conn.execute(
-        "INSERT INTO crm_settings (key, value)"
+        "INSERT INTO tcs_crm_settings (key, value)"
         " VALUES ('unanswered_after_minutes', $1::jsonb)"
         " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
         json.dumps(2),

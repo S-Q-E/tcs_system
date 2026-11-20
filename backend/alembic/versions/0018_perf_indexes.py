@@ -17,15 +17,15 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_crm_activity_log_created_at"
-        " ON crm_activity_log (created_at DESC, id DESC)"
+        "CREATE INDEX IF NOT EXISTS ix_tcs_crm_activity_log_created_at"
+        " ON tcs_crm_activity_log (created_at DESC, id DESC)"
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_crm_outbox_status_created"
-        " ON crm_outbox (status, created_at DESC, id DESC)"
+        "CREATE INDEX IF NOT EXISTS ix_tcs_crm_outbox_status_created"
+        " ON tcs_crm_outbox (status, created_at DESC, id DESC)"
     )
 
 
 def downgrade() -> None:
-    op.execute("DROP INDEX IF EXISTS ix_crm_outbox_status_created")
-    op.execute("DROP INDEX IF EXISTS ix_crm_activity_log_created_at")
+    op.execute("DROP INDEX IF EXISTS ix_tcs_crm_outbox_status_created")
+    op.execute("DROP INDEX IF EXISTS ix_tcs_crm_activity_log_created_at")

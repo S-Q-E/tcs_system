@@ -2,7 +2,7 @@
 
 Only notifications for now: the list filter stays out of scope, and auto-return
 is deferred until the CRM flag is connected to the bot workflow (roadmap P0-1).
-Writes only crm_notifications rows, through services/notifications.notify().
+Writes only tcs_crm_notifications rows, through services/notifications.notify().
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ NOTIFY_TYPE = "bot_paused_long"
 async def threshold_hours(session: AsyncSession) -> int:
     value = (
         await session.execute(
-            text("SELECT value FROM crm_settings WHERE key = :key"), {"key": SETTING_KEY}
+            text("SELECT value FROM tcs_crm_settings WHERE key = :key"), {"key": SETTING_KEY}
         )
     ).scalar_one_or_none()
     if isinstance(value, int) and not isinstance(value, bool):

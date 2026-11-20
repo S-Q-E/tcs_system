@@ -81,7 +81,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT COUNT(*) AS seen, MAX(provider_message_id) AS provider_message_id FROM n8n_processed_outbox WHERE outbox_id = $1::uuid",
+        "query": "SELECT COUNT(*) AS seen, MAX(provider_message_id) AS provider_message_id FROM tcs_n8n_processed_outbox WHERE outbox_id = $1::uuid",
         "options": {
           "queryReplacement": "={{ $json.body.outbox_id }}"
         }
@@ -178,7 +178,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO n8n_processed_outbox (outbox_id, provider_message_id) VALUES ($1::uuid, NULL) ON CONFLICT (outbox_id) DO NOTHING",
+        "query": "INSERT INTO tcs_n8n_processed_outbox (outbox_id, provider_message_id) VALUES ($1::uuid, NULL) ON CONFLICT (outbox_id) DO NOTHING",
         "options": {
           "queryReplacement": "={{ $('CRM Send Webhook').item.json.body.outbox_id }}"
         }
@@ -234,7 +234,7 @@
     },
     {
       "parameters": {
-        "content": "## TCS Send Message (Telegram)\n1. Import: Workflows -> Import from file. Attach credentials in the UI: `Postgres account`, `Telegram account` (the demo bot).\n2. `n8n_processed_outbox` comes from docs/n8n/README.md.\n3. Env `N8N_WEBHOOK_SECRET` in n8n = CRM `N8N_WEBHOOK_SECRET`.\n4. Telegram has no `success` field: success output -> Mark Sent -> Respond OK; error output -> Respond Error (502). Dedupe is written only after a successful send.\n5. Activate; webhook URL https://<n8n>/webhook/crm-send-message -> CRM `N8N_SEND_WEBHOOK_URL`.",
+        "content": "## TCS Send Message (Telegram)\n1. Import: Workflows -> Import from file. Attach credentials in the UI: `Postgres account`, `Telegram account` (the demo bot).\n2. `tcs_n8n_processed_outbox` comes from docs/n8n/README.md.\n3. Env `N8N_WEBHOOK_SECRET` in n8n = CRM `N8N_WEBHOOK_SECRET`.\n4. Telegram has no `success` field: success output -> Mark Sent -> Respond OK; error output -> Respond Error (502). Dedupe is written only after a successful send.\n5. Activate; webhook URL https://<n8n>/webhook/crm-send-message -> CRM `N8N_SEND_WEBHOOK_URL`.",
         "height": 320,
         "width": 460,
         "color": 4

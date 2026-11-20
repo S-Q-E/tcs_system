@@ -50,23 +50,23 @@ async def ops_gauges(session: AsyncSession, event_bus: EventBus) -> list[str]:
         await session.execute(
             text(
                 "SELECT MIN(COALESCE(next_attempt_at, created_at))"
-                " FROM crm_outbox WHERE status = 'queued'"
+                " FROM tcs_crm_outbox WHERE status = 'queued'"
             )
         )
     ).scalar()
     sending = (
         await session.execute(
-            text("SELECT MIN(claimed_at) FROM crm_outbox WHERE status = 'sending'")
+            text("SELECT MIN(claimed_at) FROM tcs_crm_outbox WHERE status = 'sending'")
         )
     ).scalar()
     # Empty backlog reads as 0: the age of "nothing waiting" is zero.
     emit(
-        "crm_outbox_oldest_due_seconds",
+        "tcs_crm_outbox_oldest_due_seconds",
         _age(now, queued) or 0.0,
         '{status="queued"}',
     )
     emit(
-        "crm_outbox_oldest_due_seconds",
+        "tcs_crm_outbox_oldest_due_seconds",
         _age(now, sending) or 0.0,
         '{status="sending"}',
     )

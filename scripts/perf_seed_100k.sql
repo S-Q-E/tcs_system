@@ -1,6 +1,6 @@
 -- Step 14 perf harness: synthetic load for EXPLAIN/latency analysis.
 -- All rows carry the perf14_ prefix and MUST be removed after the analysis:
---   DELETE FROM crm_conversation_state WHERE whatsapp_id LIKE 'perf14\_%';
+--   DELETE FROM tcs_crm_conversation_state WHERE whatsapp_id LIKE 'perf14\_%';
 --   DELETE FROM tcs_messages WHERE whatsapp_id LIKE 'perf14\_%';
 --   DELETE FROM tcs_events WHERE whatsapp_id LIKE 'perf14\_%';
 --   DELETE FROM tcs_leads WHERE whatsapp_id LIKE 'perf14\_%';
@@ -37,7 +37,7 @@ SELECT 'perf14_' || (1 + (g % 2000)) || '@c.us',
        now() - ((g * 3) || ' minutes')::interval
 FROM generate_series(1, 10000) g;
 
-INSERT INTO crm_conversation_state (whatsapp_id, unread_count, last_read_at, last_message_at, last_message_direction, last_message_preview)
+INSERT INTO tcs_crm_conversation_state (whatsapp_id, unread_count, last_read_at, last_message_at, last_message_direction, last_message_preview)
 SELECT 'perf14_' || g || '@c.us', CASE WHEN g % 5 = 0 THEN 3 ELSE 0 END, now(),
        now() - ((g * 29) % 50000 || ' minutes')::interval,
        CASE WHEN g % 2 = 0 THEN 'in' ELSE 'out' END,

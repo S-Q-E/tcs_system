@@ -34,23 +34,23 @@ DEFAULT_CURRENCY = "USD"
 class CrmDeal(Base):
     """CRM deal. One bot lead maps to one managed deal by default (D2)."""
 
-    __tablename__ = "crm_deals"
+    __tablename__ = "tcs_crm_deals"
     __table_args__ = (
-        CheckConstraint("status IN ('open', 'won', 'lost')", name="ck_crm_deals_status"),
+        CheckConstraint("status IN ('open', 'won', 'lost')", name="ck_tcs_crm_deals_status"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     contact_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("crm_contacts.id", ondelete="CASCADE"),
+        ForeignKey("tcs_crm_contacts.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     pipeline_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("crm_pipelines.id"), nullable=False, index=True
+        UUID(as_uuid=True), ForeignKey("tcs_crm_pipelines.id"), nullable=False, index=True
     )
     stage_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("crm_stages.id"), nullable=False, index=True
+        UUID(as_uuid=True), ForeignKey("tcs_crm_stages.id"), nullable=False, index=True
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
@@ -59,14 +59,14 @@ class CrmDeal(Base):
     )
     owner_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("crm_users.id", ondelete="SET NULL"),
+        ForeignKey("tcs_crm_users.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
     status: Mapped[str] = mapped_column(String(8), nullable=False, server_default=DEAL_STATUS_OPEN)
     lost_reason_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("crm_lost_reasons.id", ondelete="SET NULL"),
+        ForeignKey("tcs_crm_lost_reasons.id", ondelete="SET NULL"),
         nullable=True,
     )
     trial_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -98,29 +98,29 @@ class CrmDeal(Base):
 class CrmDealStageHistory(Base):
     """Recorded deal stage movements (manager, bot, or system)."""
 
-    __tablename__ = "crm_deal_stage_history"
+    __tablename__ = "tcs_crm_deal_stage_history"
     __table_args__ = (
         CheckConstraint(
-            "source IN ('manager', 'bot', 'system')", name="ck_crm_deal_stage_history_source"
+            "source IN ('manager', 'bot', 'system')", name="ck_tcs_crm_deal_stage_history_source"
         ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     deal_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("crm_deals.id", ondelete="CASCADE"),
+        ForeignKey("tcs_crm_deals.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     from_stage_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("crm_stages.id", ondelete="SET NULL"), nullable=True
+        UUID(as_uuid=True), ForeignKey("tcs_crm_stages.id", ondelete="SET NULL"), nullable=True
     )
     to_stage_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("crm_stages.id", ondelete="SET NULL"), nullable=True
+        UUID(as_uuid=True), ForeignKey("tcs_crm_stages.id", ondelete="SET NULL"), nullable=True
     )
     changed_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("crm_users.id", ondelete="SET NULL"),
+        ForeignKey("tcs_crm_users.id", ondelete="SET NULL"),
         nullable=True,
     )
     source: Mapped[str] = mapped_column(String(8), nullable=False)

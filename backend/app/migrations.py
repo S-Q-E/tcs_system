@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-VERSION_TABLE = "crm_alembic_version"
-CRM_PREFIX = "crm_"
+VERSION_TABLE = "tcs_crm_alembic_version"
+CRM_PREFIX = "tcs_crm_"
 
 
 def include_object(obj, name: str | None, type_: str, reflected: bool, compare_to) -> bool:

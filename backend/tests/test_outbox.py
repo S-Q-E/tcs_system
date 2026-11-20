@@ -48,7 +48,7 @@ async def _outbox_row(factory, wa: str) -> dict | None:
                     text(
                         "SELECT id, whatsapp_id, status, attempts, error,"
                         " provider_message_id, tcs_message_id, sent_at,"
-                        " next_attempt_at FROM crm_outbox"
+                        " next_attempt_at FROM tcs_crm_outbox"
                         " WHERE whatsapp_id = :wa ORDER BY created_at DESC LIMIT 1"
                     ),
                     {"wa": wa},
@@ -64,7 +64,7 @@ async def _force_due(factory, outbox_id: str) -> None:
     async with factory() as session:
         await session.execute(
             text(
-                "UPDATE crm_outbox SET next_attempt_at = now() - interval '1 second'"
+                "UPDATE tcs_crm_outbox SET next_attempt_at = now() - interval '1 second'"
                 " WHERE id = :id"
             ),
             {"id": outbox_id},
@@ -79,16 +79,18 @@ async def _purge(factory, wa: str, user_ids: list[str]) -> None:
         contacts = (
             (
                 await session.execute(
-                    text("SELECT id FROM crm_contacts WHERE whatsapp_id = :wa"), {"wa": wa}
+                    text("SELECT id FROM tcs_crm_contacts WHERE whatsapp_id = :wa"), {"wa": wa}
                 )
             )
             .scalars()
             .all()
         )
-        await session.execute(text("DELETE FROM crm_outbox WHERE whatsapp_id = :wa"), {"wa": wa})
+        await session.execute(
+            text("DELETE FROM tcs_crm_outbox WHERE whatsapp_id = :wa"), {"wa": wa}
+        )
         if user_ids:
             await session.execute(
-                text("DELETE FROM crm_notifications WHERE user_id = ANY(:ids)"),
+                text("DELETE FROM tcs_crm_notifications WHERE user_id = ANY(:ids)"),
                 {"ids": user_ids},
             )
         # Delete the bot lead directly: purge_contacts skips lead cleanup when no
@@ -144,7 +146,9 @@ async def test_queue_message_returns_202_and_autopauses(client, settings):
         async with factory() as session:
             paused = (
                 await session.execute(
-                    text("SELECT bot_paused FROM crm_conversation_state WHERE whatsapp_id = :wa"),
+                    text(
+                        "SELECT bot_paused FROM tcs_crm_conversation_state WHERE whatsapp_id = :wa"
+                    ),
                     {"wa": wa},
                 )
             ).scalar()
@@ -152,7 +156,7 @@ async def test_queue_message_returns_202_and_autopauses(client, settings):
             logged = (
                 await session.execute(
                     text(
-                        "SELECT action FROM crm_activity_log WHERE action = 'bot_paused'"
+                        "SELECT action FROM tcs_crm_activity_log WHERE action = 'bot_paused'"
                         " AND diff ->> 'whatsapp_id' = :wa"
                     ),
                     {"wa": wa},
@@ -321,7 +325,7 @@ async def test_worker_fails_after_five_attempts_and_notifies(client, settings):
                 (
                     await session.execute(
                         text(
-                            "SELECT type, payload FROM crm_notifications"
+                            "SELECT type, payload FROM tcs_crm_notifications"
                             " WHERE user_id = :id ORDER BY created_at"
                         ),
                         {"id": admin["user"]["id"]},
@@ -349,7 +353,8 @@ async def test_pause_resume_endpoints_and_timeline(client, settings):
             deal_id = (
                 await session.execute(
                     text(
-                        "SELECT d.id FROM crm_deals d JOIN crm_contacts c ON c.id = d.contact_id"
+                        "SELECT d.id FROM tcs_crm_deals d"
+                        " JOIN tcs_crm_contacts c ON c.id = d.contact_id"
                         " WHERE c.whatsapp_id = :wa"
                     ),
                     {"wa": wa},
@@ -389,7 +394,7 @@ async def test_autopause_disabled_via_setting(client, settings):
         async with factory() as session:
             await session.execute(
                 text(
-                    "INSERT INTO crm_settings (key, value) VALUES"
+                    "INSERT INTO tcs_crm_settings (key, value) VALUES"
                     " ('auto_pause_on_manual_reply', 'false')"
                     " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
                 )
@@ -406,7 +411,8 @@ async def test_autopause_disabled_via_setting(client, settings):
                 paused = (
                     await session.execute(
                         text(
-                            "SELECT bot_paused FROM crm_conversation_state WHERE whatsapp_id = :wa"
+                            "SELECT bot_paused FROM tcs_crm_conversation_state"
+                            " WHERE whatsapp_id = :wa"
                         ),
                         {"wa": wa},
                     )
@@ -415,7 +421,7 @@ async def test_autopause_disabled_via_setting(client, settings):
         finally:
             async with factory() as session:
                 await session.execute(
-                    text("DELETE FROM crm_settings WHERE key = 'auto_pause_on_manual_reply'")
+                    text("DELETE FROM tcs_crm_settings WHERE key = 'auto_pause_on_manual_reply'")
                 )
                 await session.commit()
     finally:
@@ -435,7 +441,7 @@ async def test_retry_endpoint(client, settings):
         outbox_id = queued.json()["id"]
         async with factory() as session:
             await session.execute(
-                text("UPDATE crm_outbox SET status = 'failed', attempts = 5 WHERE id = :id"),
+                text("UPDATE tcs_crm_outbox SET status = 'failed', attempts = 5 WHERE id = :id"),
                 {"id": outbox_id},
             )
             await session.commit()
@@ -623,7 +629,8 @@ async def test_manager_send_flow_end_to_end(client, app, settings):
             deal_id = (
                 await session.execute(
                     text(
-                        "SELECT d.id FROM crm_deals d JOIN crm_contacts c ON c.id = d.contact_id"
+                        "SELECT d.id FROM tcs_crm_deals d"
+                        " JOIN tcs_crm_contacts c ON c.id = d.contact_id"
                         " WHERE c.whatsapp_id = :wa"
                     ),
                     {"wa": wa},
@@ -786,7 +793,7 @@ async def test_stale_sending_reaped_without_redelivery(client, settings):
         async with factory() as session:
             await session.execute(
                 text(
-                    "UPDATE crm_outbox SET status = 'sending',"
+                    "UPDATE tcs_crm_outbox SET status = 'sending',"
                     " claimed_at = now() - interval '10 minutes'"
                     " WHERE whatsapp_id = :wa"
                 ),
@@ -794,7 +801,7 @@ async def test_stale_sending_reaped_without_redelivery(client, settings):
             )
             await session.execute(
                 text(
-                    "UPDATE crm_outbox SET status = 'sending', claimed_at = now()"
+                    "UPDATE tcs_crm_outbox SET status = 'sending', claimed_at = now()"
                     " WHERE whatsapp_id = :wa"
                 ),
                 {"wa": wa_fresh},
@@ -832,7 +839,7 @@ async def test_pause_resume_unknown_lead_404(client, settings):
         async with factory() as session:
             exists = (
                 await session.execute(
-                    text("SELECT 1 FROM crm_conversation_state WHERE whatsapp_id = :wa"),
+                    text("SELECT 1 FROM tcs_crm_conversation_state WHERE whatsapp_id = :wa"),
                     {"wa": "nonexistent@c.us"},
                 )
             ).scalar_one_or_none()
@@ -857,7 +864,7 @@ async def test_chats_respect_manager_scope(client, settings, app):
         async with factory() as session:
             await session.execute(
                 text(
-                    "INSERT INTO crm_settings (key, value) VALUES"
+                    "INSERT INTO tcs_crm_settings (key, value) VALUES"
                     " ('restrict_managers_to_own', 'true')"
                     " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
                 )
@@ -893,7 +900,7 @@ async def test_chats_respect_manager_scope(client, settings, app):
         finally:
             async with factory() as session:
                 await session.execute(
-                    text("DELETE FROM crm_settings WHERE key = 'restrict_managers_to_own'")
+                    text("DELETE FROM tcs_crm_settings WHERE key = 'restrict_managers_to_own'")
                 )
                 await session.commit()
     finally:
@@ -949,7 +956,7 @@ async def test_retry_only_author_or_admin(client, settings, app):
 async def _fail_outbox(factory, outbox_id: str) -> None:
     async with factory() as session:
         await session.execute(
-            text("UPDATE crm_outbox SET status = 'failed', attempts = 5 WHERE id = :id"),
+            text("UPDATE tcs_crm_outbox SET status = 'failed', attempts = 5 WHERE id = :id"),
             {"id": outbox_id},
         )
         await session.commit()

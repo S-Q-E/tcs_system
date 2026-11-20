@@ -19,7 +19,7 @@ from ..services.notifications import notify, publish_pending
 
 logger = logging.getLogger(__name__)
 
-OUTBOX_LOCK_KEY = 91030003
+OUTBOX_LOCK_KEY = 92030003
 OUTBOX_BATCH_SIZE = 50
 OUTBOX_MAX_ATTEMPTS = 5
 OUTBOX_HTTP_TIMEOUT_SECONDS = 10.0
@@ -30,7 +30,7 @@ OUTBOX_HTTP_TIMEOUT_SECONDS = 10.0
 OUTBOX_STALE_SENDING_SECONDS = 120
 STALE_SENDING_ERROR = "delivery state unknown, check chat"
 
-# Maximum characters stored in crm_outbox.error: class name + short message.
+# Maximum characters stored in tcs_crm_outbox.error: class name + short message.
 OUTBOX_ERROR_MAX_CHARS = 200
 
 
@@ -248,7 +248,7 @@ async def _apply_success(
             updated = (
                 await session.execute(
                     text(
-                        "UPDATE crm_outbox SET status = 'sent', sent_at = :now,"
+                        "UPDATE tcs_crm_outbox SET status = 'sent', sent_at = :now,"
                         " provider_message_id = :provider_id, error = NULL,"
                         " claimed_at = NULL"
                         " WHERE id = :id AND status = 'sending'"
@@ -270,12 +270,12 @@ async def _apply_success(
                 # Log only the error class: messages and phones never go to logs.
                 logger.error("outbox %s mirror failed: %s", outbox_id, type(exc).__name__)
                 await session.execute(
-                    text("UPDATE crm_outbox SET error = :error WHERE id = :id"),
+                    text("UPDATE tcs_crm_outbox SET error = :error WHERE id = :id"),
                     {"error": f"mirror_failed: {format_outbox_error(exc)}", "id": outbox_id},
                 )
             else:
                 await session.execute(
-                    text("UPDATE crm_outbox SET tcs_message_id = :mid WHERE id = :id"),
+                    text("UPDATE tcs_crm_outbox SET tcs_message_id = :mid WHERE id = :id"),
                     {"mid": message_id, "id": outbox_id},
                 )
             state = await session.get(CrmConversationState, whatsapp_id)

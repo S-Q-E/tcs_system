@@ -30,7 +30,7 @@ class CrmImport(Base):
             "status IN ('queued', 'running', 'done', 'failed')",
             name="ck_tcs_crm_imports_status",
         ),
-        CheckConstraint("entity IN ('contact', 'deal')", name="ck_tcs_crm_imports_entity"),
+        CheckConstraint("entity IN ('contact', 'deal', 'unit')", name="ck_tcs_crm_imports_entity"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

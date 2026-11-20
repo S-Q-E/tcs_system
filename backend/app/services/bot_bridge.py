@@ -115,6 +115,78 @@ async def insert_outgoing_message(session: AsyncSession, whatsapp_id: str, body:
     return int(message_id)
 
 
+async def book_viewing(
+    session: AsyncSession,
+    *,
+    whatsapp_id: str | None,
+    slot_id: uuid.UUID,
+    unit_id: uuid.UUID | None = None,
+    client_name: str | None = None,
+    client_phone: str | None = None,
+    deal_id: uuid.UUID | None = None,
+    contact_id: uuid.UUID | None = None,
+    notes: str | None = None,
+    created_by: uuid.UUID | None = None,
+) -> tuple[str, uuid.UUID | None]:
+    """Atomically book a viewing slot via Postgres function tcs_crm_book_viewing."""
+    row = (
+        await session.execute(
+            text(
+                "SELECT result, booking_id FROM tcs_crm_book_viewing("
+                " :whatsapp_id, :slot_id, :unit_id, :client_name, :client_phone,"
+                " :deal_id, :contact_id, :notes, :created_by)"
+            ),
+            {
+                "whatsapp_id": whatsapp_id,
+                "slot_id": slot_id,
+                "unit_id": unit_id,
+                "client_name": client_name,
+                "client_phone": client_phone,
+                "deal_id": deal_id,
+                "contact_id": contact_id,
+                "notes": notes,
+                "created_by": created_by,
+            },
+        )
+    ).one()
+    return str(row[0]), row[1]
+
+
+async def cancel_viewing(
+    session: AsyncSession,
+    *,
+    booking_id: uuid.UUID,
+    reason: str | None = None,
+) -> tuple[str, uuid.UUID | None]:
+    """Atomically cancel a viewing booking via Postgres function tcs_crm_cancel_viewing."""
+    row = (
+        await session.execute(
+            text("SELECT result, booking_id FROM tcs_crm_cancel_viewing(:booking_id, :reason)"),
+            {"booking_id": booking_id, "reason": reason},
+        )
+    ).one()
+    return str(row[0]), row[1]
+
+
+async def reschedule_viewing(
+    session: AsyncSession,
+    *,
+    booking_id: uuid.UUID,
+    new_slot_id: uuid.UUID,
+) -> tuple[str, uuid.UUID | None]:
+    """Atomically reschedule a viewing via Postgres function tcs_crm_reschedule_viewing."""
+    row = (
+        await session.execute(
+            text(
+                "SELECT result, booking_id FROM tcs_crm_reschedule_viewing("
+                " :booking_id, :new_slot_id)"
+            ),
+            {"booking_id": booking_id, "new_slot_id": new_slot_id},
+        )
+    ).one()
+    return str(row[0]), row[1]
+
+
 def _json(payload: dict) -> str:
     import json
 

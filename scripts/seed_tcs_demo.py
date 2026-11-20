@@ -539,8 +539,39 @@ async def seed_demo_leads(conn: asyncpg.Connection) -> None:
     )
 
 
+async def ensure_bot_tool_tables(conn: asyncpg.Connection) -> None:
+    """Tables used by the bot's book_viewing / handoff_to_human tools."""
+    await conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS viewing_bookings (
+            id BIGSERIAL PRIMARY KEY,
+            client_name TEXT,
+            client_phone TEXT,
+            unit_id TEXT,
+            viewing_date DATE,
+            viewing_time TEXT,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+        """
+    )
+    await conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS manager_handoffs (
+            id BIGSERIAL PRIMARY KEY,
+            client_phone TEXT,
+            reason TEXT,
+            conversation_summary TEXT,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+        """
+    )
+
+
 async def run_seed(conn: asyncpg.Connection) -> dict[str, int]:
     """Seed everything; every step is idempotent. Returns counters."""
+    await ensure_bot_tool_tables(conn)
     await seed_settings(conn)
     units = await seed_units(conn)
     await seed_demo_leads(conn)

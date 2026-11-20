@@ -96,7 +96,8 @@
       ],
       "credentials": {
         "postgres": {
-          "name": "Postgres account"
+          "id": "8geagl0wTR2yx7go",
+          "name": "postgres demo"
         }
       },
       "alwaysOutputData": true
@@ -170,7 +171,8 @@
       ],
       "credentials": {
         "telegramApi": {
-          "name": "Telegram account"
+          "id": "Bl5dMUlxAbvjD5e5",
+          "name": "tcs demo bot"
         }
       },
       "onError": "continueErrorOutput"
@@ -193,7 +195,8 @@
       ],
       "credentials": {
         "postgres": {
-          "name": "Postgres account"
+          "id": "8geagl0wTR2yx7go",
+          "name": "postgres demo"
         }
       },
       "onError": "continueRegularOutput"

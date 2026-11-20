@@ -24,7 +24,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT l.whatsapp_id,\n       l.trial_datetime,\n       to_char(l.trial_datetime AT TIME ZONE 'America/New_York',\n               'Dy Mon DD, HH12:MI AM') AS local_time,\n       COALESCE(u.building, 'our office') AS building,\n       COALESCE(u.unit_number, 'TBD') AS unit_number,\n       'Reminder: your viewing is '\n         || to_char(l.trial_datetime AT TIME ZONE 'America/New_York',\n                    'Dy Mon DD, HH12:MI AM')\n         || ' at ' || COALESCE(u.building, 'our office')\n         || ', Unit ' || COALESCE(u.unit_number, 'TBD')\n         || '. Message here if you need to reschedule.' AS reminder_text\nFROM tcs_leads l\nLEFT JOIN tcs_units u\n  ON (u.building || ' ' || u.unit_number) = (l.lead_data->>'unit')\nWHERE l.trial_datetime > now()\n  AND l.trial_datetime <= now() + interval '24 hours'\n  AND COALESCE(l.reminder_sent, false) = false\n  AND l.whatsapp_id LIKE 'tg:%'\n  AND NOT EXISTS (\n    SELECT 1 FROM tcs_crm_conversation_state s\n    WHERE s.whatsapp_id = l.whatsapp_id AND s.bot_paused = true\n  )\nORDER BY l.trial_datetime;",
+        "query": "SELECT l.whatsapp_id,\n       l.trial_datetime,\n       to_char(l.trial_datetime AT TIME ZONE 'America/New_York',\n               'Dy Mon DD, HH12:MI AM') AS local_time,\n       COALESCE(u.building, 'our office') AS building,\n       COALESCE(u.unit_number, 'TBD') AS unit_number,\n       'Reminder: your viewing is '\n         || to_char(l.trial_datetime AT TIME ZONE 'America/New_York',\n                    'Dy Mon DD, HH12:MI AM')\n         || ' at ' || COALESCE(u.building, 'our office')\n         || ', Unit ' || COALESCE(u.unit_number, 'TBD')\n         || '. Message here if you need to reschedule.' AS reminder_text\nFROM tcs_leads l\nLEFT JOIN tcs_crm_units u\n  ON u.deleted_at IS NULL\n AND (u.building || ' ' || u.unit_number) = (l.lead_data->>'unit')\nWHERE l.trial_datetime > now()\n  AND l.trial_datetime <= now() + interval '24 hours'\n  AND COALESCE(l.reminder_sent, false) = false\n  AND l.whatsapp_id LIKE 'tg:%'\n  AND NOT EXISTS (\n    SELECT 1 FROM tcs_crm_conversation_state s\n    WHERE s.whatsapp_id = l.whatsapp_id AND s.bot_paused = true\n  )\nORDER BY l.trial_datetime;",
         "options": {}
       },
       "id": "b16544e1-e131-569e-b505-06dfce2d2d92",
@@ -37,7 +37,8 @@
       ],
       "credentials": {
         "postgres": {
-          "name": "Postgres account"
+          "id": "8geagl0wTR2yx7go",
+          "name": "postgres demo"
         }
       },
       "alwaysOutputData": true
@@ -60,7 +61,8 @@
       ],
       "credentials": {
         "telegramApi": {
-          "name": "Telegram account"
+          "id": "Bl5dMUlxAbvjD5e5",
+          "name": "tcs demo bot"
         }
       },
       "onError": "continueErrorOutput",
@@ -86,7 +88,8 @@
       ],
       "credentials": {
         "postgres": {
-          "name": "Postgres account"
+          "id": "8geagl0wTR2yx7go",
+          "name": "postgres demo"
         }
       },
       "onError": "continueRegularOutput"

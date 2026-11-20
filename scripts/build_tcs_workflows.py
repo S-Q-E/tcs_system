@@ -36,8 +36,8 @@ OUT_SEND = N8N_DIR / "tcs-send-message-telegram.workflow.json"
 OUT_BOT = WORKFLOWS / "tcs_bot.json"
 OUT_REMINDERS = WORKFLOWS / "tcs_reminders.json"
 
-TELEGRAM_CREDS = {"telegramApi": {"name": "Telegram account"}}
-POSTGRES_CREDS = {"postgres": {"name": "Postgres account"}}
+TELEGRAM_CREDS = {"telegramApi": {"id": "Bl5dMUlxAbvjD5e5", "name": "tcs demo bot"}}
+POSTGRES_CREDS = {"postgres": {"id": "8geagl0wTR2yx7go", "name": "postgres demo"}}
 TOOLS_MIN = ("search_units", "get_slots", "book_viewing", "handoff_to_human")
 
 TCS_STAGES = [
@@ -327,8 +327,24 @@ def build_send_message() -> dict:
 
 
 def _template_nodes() -> dict[str, dict]:
-    data = json.loads(BOT_ORIGINAL.read_text(encoding="utf-8"))
-    return {n["name"]: n for n in data["nodes"]}
+    if BOT_ORIGINAL.exists():
+        data = json.loads(BOT_ORIGINAL.read_text(encoding="utf-8"))
+        return {n["name"]: n for n in data["nodes"]}
+    return {
+        "Postgres Chat Memory": {
+            "parameters": {
+                "sessionIdType": "customKey",
+                "sessionKey": "={{ $('Normalize Message').item.json.whatsapp_id }}",
+                "contextWindowLength": 10,
+            }
+        },
+        "OpenRouter Chat Model": {
+            "parameters": {
+                "model": "openai/gpt-4o-mini",
+                "options": {},
+            }
+        },
+    }
 
 
 def _parser_schema() -> str:
@@ -436,11 +452,6 @@ return [{
 
 
 def build_bot() -> dict:
-    if not BOT_ORIGINAL.exists():
-        raise SystemExit(
-            f"Bot template not found: {BOT_ORIGINAL}. "
-            "Set TCS_BOT_TEMPLATE=<path to the original workflow export>."
-        )
     known = _template_nodes()
     prompt = BOT_PROMPT.read_text(encoding="utf-8").rstrip()
     state_block = """
@@ -717,15 +728,28 @@ whatsapp_id: {{ $('Upsert & Load Lead State').item.json.whatsapp_id }}
             {
                 "operation": "executeQuery",
                 "query": "UPDATE tcs_leads SET"
-                " current_stage = $2, previous_stage = $3, status = $4,"
+                " current_stage = CASE"
+                " WHEN current_stage = 'VIEWING_SCHEDULED' AND trial_datetime > now()"
+                " AND $2 IN ('NEW_INQUIRY', 'QUALIFIED') THEN current_stage ELSE $2 END,"
+                " previous_stage = CASE"
+                " WHEN current_stage = 'VIEWING_SCHEDULED' AND trial_datetime > now()"
+                " AND $2 IN ('NEW_INQUIRY', 'QUALIFIED') THEN previous_stage ELSE $3 END,"
+                " status = CASE"
+                " WHEN current_stage = 'VIEWING_SCHEDULED' AND trial_datetime > now()"
+                " AND status = 'VIEWING_BOOKED'"
+                " AND $4 NOT IN ('VIEWING_BOOKED', 'HANDOFF', 'LEASED', 'LOST')"
+                " THEN status ELSE $4 END,"
                 " lead_data = COALESCE(lead_data, '{}'::jsonb) || $5::jsonb,"
                 " last_objection = COALESCE(NULLIF($6, ''), last_objection),"
                 " direction = COALESCE(NULLIF($7, ''), direction),"
                 " goal = COALESCE(NULLIF($8, ''), goal),"
                 " preferred_format = COALESCE(NULLIF($9, ''), preferred_format),"
                 " preferred_time = COALESCE(NULLIF($10, ''), preferred_time),"
-                " confidence_last = $11,"
-                " reminder_sent = CASE WHEN $2 <> current_stage THEN false ELSE reminder_sent END,"
+                " confidence_last = NULLIF($11::text, '')::numeric,"
+                " reminder_sent = CASE"
+                " WHEN current_stage = 'VIEWING_SCHEDULED' AND trial_datetime > now()"
+                " THEN reminder_sent"
+                " WHEN $2 <> current_stage THEN false ELSE reminder_sent END,"
                 " last_message_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP"
                 " WHERE whatsapp_id = $1;",
                 "options": {
@@ -918,18 +942,20 @@ whatsapp_id: {{ $('Upsert & Load Lead State').item.json.whatsapp_id }}
         node(
             "search_units",
             "n8n-nodes-base.postgresTool",
-            1,
+            2.8,
             [2000, 700],
             {
+                "descriptionType": "manual",
                 "operation": "executeQuery",
                 "query": read_spec_block("## 1. search_units", "sql"),
                 "options": {
-                    "queryReplacement": "={{ [ $fromAI('beds', 'Bedrooms wanted (number)',"
-                    " 'number'), $fromAI('max_rent', 'Maximum monthly rent in USD', 'number'),"
-                    " $fromAI('pets', 'true when the person has a pet', 'boolean') ] }}"
+                    "queryReplacement": "={{ [ $fromAI('beds', 'Bedrooms wanted (integer) or null',"
+                    " 'number', null), $fromAI('max_rent', 'Maximum monthly rent in USD or null',"
+                    " 'number', null), $fromAI('pets', 'true when the person has a pet or null',"
+                    " 'boolean', null) ] }}"
                 },
-                "toolDescription": "Search available apartments. Use for any question"
-                " about availability, price, or building.",
+                "toolDescription": "Search available apartments in TCS Property Management"
+                " (returns unit_id, building, unit_number, beds, baths, rent_usd, pets_policy).",
             },
             credentials=POSTGRES_CREDS,
         )
@@ -937,37 +963,45 @@ whatsapp_id: {{ $('Upsert & Load Lead State').item.json.whatsapp_id }}
     nodes.append(
         node(
             "get_slots",
-            "@n8n/n8n-nodes-langchain.toolCode",
-            1,
+            "n8n-nodes-base.postgresTool",
+            2.8,
             [2240, 700],
             {
-                "description": "Offer up to 3 viewing slots (30 min, Mon-Fri 09:00-17:00"
-                " America/New_York, at least 3 hours ahead, next 7 days).",
-                "jsCode": read_spec_block("## 2. get_slots", "js"),
+                "descriptionType": "manual",
+                "operation": "executeQuery",
+                "query": read_spec_block("## 2. get_slots", "sql"),
+                "options": {
+                    "queryReplacement": "={{ [ $fromAI('unit_id',"
+                    " 'Optional unit_id UUID from search_units, or empty string', 'string', '') ] }}"
+                },
+                "toolDescription": "Fetch up to 3 open future viewing slots in the next 7 days"
+                " from tcs_crm_viewing_slots. Offer ONLY slots returned by this tool.",
             },
+            credentials=POSTGRES_CREDS,
         )
     )
     nodes.append(
         node(
             "book_viewing",
             "n8n-nodes-base.postgresTool",
-            1,
+            2.8,
             [2480, 700],
             {
+                "descriptionType": "manual",
                 "operation": "executeQuery",
                 "query": read_spec_block("## 3. book_viewing", "sql"),
                 "options": {
                     "queryReplacement": "={{ [ $('Normalize Message').item.json.whatsapp_id,"
-                    " $fromAI('slot', 'ISO 8601 datetime of the chosen slot', 'string'),"
-                    " $fromAI('direction', 'Short unit line for the CRM,"
-                    " e.g. 2BR · Demo Residences A · $2,150', 'string'),"
-                    " $fromAI('goal', 'Move-in and budget,"
-                    " e.g. Move in by Jan 1 · budget $2,200', 'string'),"
-                    " $fromAI('building', 'Building name', 'string'),"
-                    " $fromAI('unit_number', 'Unit number', 'string') ] }}"
+                    " $fromAI('slot_id', 'Exact slot_id UUID returned by get_slots', 'string'),"
+                    " $fromAI('unit_id', 'unit_id UUID from search_units, or empty string',"
+                    " 'string', ''),"
+                    " $fromAI('client_name', 'Client name, or empty string', 'string', ''),"
+                    " $fromAI('client_phone', 'Client phone number if provided, or empty string',"
+                    " 'string', '') ] }}"
                 },
-                "toolDescription": "Book a viewing for the chosen slot. Returns"
-                " 'booked' or 'slot_taken'.",
+                "toolDescription": "Book a viewing slot via tcs_crm_book_viewing. Returns"
+                " result ('booked' | 'slot_taken' | 'slot_not_found' | 'slot_in_past'"
+                " | 'unit_mismatch' | 'lead_not_found') and booking_id.",
             },
             credentials=POSTGRES_CREDS,
         )
@@ -976,18 +1010,19 @@ whatsapp_id: {{ $('Upsert & Load Lead State').item.json.whatsapp_id }}
         node(
             "handoff_to_human",
             "n8n-nodes-base.postgresTool",
-            1,
+            2.8,
             [2720, 700],
             {
+                "descriptionType": "manual",
                 "operation": "executeQuery",
                 "query": read_spec_block("## 4. handoff_to_human", "sql"),
                 "options": {
                     "queryReplacement": "={{ [ $('Normalize Message').item.json.whatsapp_id,"
-                    " $fromAI('reason', 'Why a human is needed', 'string') ] }}"
+                    " $fromAI('reason', 'Why a human is needed', 'string', '') ] }}"
                 },
                 "toolDescription": "Hand the conversation to the office team. Call for"
-                " out-of-scope questions, accommodation requests, emergencies, or when"
-                " you do not know the answer.",
+                " out-of-scope questions, accommodation requests, emergencies, when no"
+                " slots are available, or when you do not know the answer.",
             },
             credentials=POSTGRES_CREDS,
         )
@@ -1086,8 +1121,9 @@ SELECT l.whatsapp_id,
          || ', Unit ' || COALESCE(u.unit_number, 'TBD')
          || '. Message here if you need to reschedule.' AS reminder_text
 FROM tcs_leads l
-LEFT JOIN tcs_units u
-  ON (u.building || ' ' || u.unit_number) = (l.lead_data->>'unit')
+LEFT JOIN tcs_crm_units u
+  ON u.deleted_at IS NULL
+ AND (u.building || ' ' || u.unit_number) = (l.lead_data->>'unit')
 WHERE l.trial_datetime > now()
   AND l.trial_datetime <= now() + interval '24 hours'
   AND COALESCE(l.reminder_sent, false) = false

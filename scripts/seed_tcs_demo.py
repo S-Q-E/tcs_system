@@ -182,25 +182,7 @@ async def pipeline_error(conn: asyncpg.Connection) -> str | None:
 
 
 async def seed_units(conn: asyncpg.Connection) -> int:
-    """Create tcs_units (idempotent) and insert 14 demo units (2 leased)."""
-    await conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS tcs_units (
-            id SERIAL PRIMARY KEY,
-            building TEXT,
-            unit_number TEXT,
-            beds INT,
-            baths NUMERIC,
-            rent_usd INT,
-            deposit_usd INT,
-            available_from DATE,
-            status TEXT DEFAULT 'available',
-            pets_policy TEXT,
-            description TEXT,
-            UNIQUE (building, unit_number)
-        )
-        """
-    )
+    """Insert 14 demo units (2 leased) into tcs_crm_units (idempotent)."""
     now = datetime.now(ET).date()
     rows: list[tuple] = []
     unit_index = 0
@@ -242,11 +224,39 @@ async def seed_units(conn: asyncpg.Connection) -> int:
             )
     await conn.executemany(
         """
-        INSERT INTO tcs_units (
+        INSERT INTO tcs_crm_units (
             building, unit_number, beds, baths, rent_usd, deposit_usd,
             available_from, status, pets_policy, description
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        ON CONFLICT (building, unit_number) DO NOTHING
+        ON CONFLICT (building, unit_number) WHERE deleted_at IS NULL DO NOTHING
+        """,
+        rows,
+    )
+    return len(rows)
+
+
+async def seed_viewing_slots(conn: asyncpg.Connection, days: int = 14) -> int:
+    """Generate Mon-Fri 10:00-17:00 America/New_York (60-min) slots for next N days."""
+    now_utc = datetime.now(UTC)
+    today_et = now_utc.astimezone(ET).date()
+    rows: list[tuple[datetime, int]] = []
+    for offset in range(days + 1):
+        day = today_et + timedelta(days=offset)
+        if day.weekday() >= 5:
+            continue
+        for hour in range(10, 17):
+            starts_at = datetime(day.year, day.month, day.day, hour, 0, tzinfo=ET).astimezone(UTC)
+            if starts_at <= now_utc:
+                continue
+            rows.append((starts_at, 60))
+    if not rows:
+        return 0
+    await conn.executemany(
+        """
+        INSERT INTO tcs_crm_viewing_slots (starts_at, duration_min, status)
+        VALUES ($1, $2, 'open')
+        ON CONFLICT (starts_at, COALESCE(unit_id, '00000000-0000-0000-0000-000000000000'::uuid))
+        DO NOTHING
         """,
         rows,
     )
@@ -336,10 +346,11 @@ async def seed_demo_leads(conn: asyncpg.Connection) -> None:
     rng.shuffle(after_hours_flags)
 
     unit_rows = await conn.fetch(
-        "SELECT building, unit_number, beds, rent_usd FROM tcs_units ORDER BY id"
+        "SELECT building, unit_number, beds, rent_usd FROM tcs_crm_units"
+        " WHERE deleted_at IS NULL ORDER BY building, unit_number"
     )
     if not unit_rows:
-        raise RuntimeError("tcs_units is empty; run the units step first")
+        raise RuntimeError("tcs_crm_units is empty; run the units step first")
 
     # The single unanswered dialog: NEW_INQUIRY, last message 'in' 30 min ago.
     unanswered_index = 0
@@ -539,41 +550,11 @@ async def seed_demo_leads(conn: asyncpg.Connection) -> None:
     )
 
 
-async def ensure_bot_tool_tables(conn: asyncpg.Connection) -> None:
-    """Tables used by the bot's book_viewing / handoff_to_human tools."""
-    await conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS viewing_bookings (
-            id BIGSERIAL PRIMARY KEY,
-            client_name TEXT,
-            client_phone TEXT,
-            unit_id TEXT,
-            viewing_date DATE,
-            viewing_time TEXT,
-            status TEXT NOT NULL DEFAULT 'pending',
-            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-        )
-        """
-    )
-    await conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS manager_handoffs (
-            id BIGSERIAL PRIMARY KEY,
-            client_phone TEXT,
-            reason TEXT,
-            conversation_summary TEXT,
-            status TEXT NOT NULL DEFAULT 'pending',
-            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-        )
-        """
-    )
-
-
 async def run_seed(conn: asyncpg.Connection) -> dict[str, int]:
     """Seed everything; every step is idempotent. Returns counters."""
-    await ensure_bot_tool_tables(conn)
     await seed_settings(conn)
     units = await seed_units(conn)
+    slots = await seed_viewing_slots(conn, days=14)
     await seed_demo_leads(conn)
     leads = await conn.fetchval("SELECT COUNT(*) FROM tcs_leads WHERE source = $1", DEMO_SOURCE)
     messages = await conn.fetchval(
@@ -581,7 +562,7 @@ async def run_seed(conn: asyncpg.Connection) -> dict[str, int]:
         " WHERE whatsapp_id IN (SELECT whatsapp_id FROM tcs_leads WHERE source = $1)",
         DEMO_SOURCE,
     )
-    return {"units": units, "leads": int(leads), "messages": int(messages)}
+    return {"units": units, "slots": slots, "leads": int(leads), "messages": int(messages)}
 
 
 async def main(argv: list[str] | None = None) -> int:

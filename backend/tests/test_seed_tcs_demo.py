@@ -87,6 +87,18 @@ async def test_seed_idempotent_and_complete(conn):
     assert first == second
     assert first["leads"] == 30
     assert first["units"] == 14
+    assert first["slots"] > 0
+
+    crm_units = await conn.fetchval(
+        "SELECT COUNT(*) FROM tcs_crm_units WHERE deleted_at IS NULL"
+    )
+    assert crm_units >= 14
+    crm_slots = await conn.fetchval(
+        "SELECT COUNT(*) FROM tcs_crm_viewing_slots WHERE starts_at > now()"
+    )
+    assert crm_slots >= first["slots"]
+    for legacy in ("tcs_units", "viewing_bookings", "manager_handoffs"):
+        assert await conn.fetchval("SELECT to_regclass($1)", legacy) is None
 
     # The pipeline is the only one and has exactly six stages (from Alembic).
     pipelines = await conn.fetch("SELECT name, is_default FROM tcs_crm_pipelines ORDER BY name")

@@ -38,6 +38,12 @@ The image runs `alembic upgrade head` on every boot. The tcs_* backfills are
 guarded, so migrations also succeed on a brand-new database; the seed applies
 the bot schema when it is missing. Run exactly this order:
 
+> Use a **dedicated demo database**. The CRM expects the bot tables from
+> `docs/db_schema.md` (`tcs_messages.content`, `tcs_events.payload`, …). If
+> `DATABASE_URL` points at a database that already holds `tcs_*` tables from
+> another bot, the guarded backfills are skipped instead of failing, but the
+> CRM cannot read those messages or events.
+
 ```bash
 cd tcs_demo
 export RAILWAY_DB='postgresql://...:...@...:..../railway?sslmode=require'

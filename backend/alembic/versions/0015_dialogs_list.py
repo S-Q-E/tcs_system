@@ -25,12 +25,14 @@ def upgrade() -> None:
         sa.Column("last_message_preview", sa.Text(), nullable=True),
     )
     # tcs_* tables are owned by the bot and may be absent (fresh database):
-    # guard the backfill the same way 0009 and 0022 do.
+    # guard the backfill the same way 0009 and 0022 do. Checking the columns
+    # too keeps the migration safe on a shared database where a foreign
+    # ``tcs_messages`` table exists with a different shape.
     op.execute(
         sa.text(
             "DO $$ BEGIN "
-            "IF EXISTS (SELECT 1 FROM information_schema.tables "
-            "WHERE table_name = 'tcs_messages') THEN "
+            "IF EXISTS (SELECT 1 FROM information_schema.columns "
+            "WHERE table_name = 'tcs_messages' AND column_name = 'content') THEN "
             "UPDATE tcs_crm_conversation_state s SET"
             " last_message_at = m.created_at,"
             " last_message_direction = m.direction,"

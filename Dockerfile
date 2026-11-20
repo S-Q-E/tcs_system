@@ -30,6 +30,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend ./backend
 COPY scripts ./scripts
+# scripts/seed_tcs_demo.py applies the bot schema from the test fixture.
+COPY tests/fixtures/tcs_schema.sql ./tests/fixtures/tcs_schema.sql
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
 RUN useradd --system --no-create-home --shell /usr/sbin/nologin appuser \

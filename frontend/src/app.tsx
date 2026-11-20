@@ -10,7 +10,9 @@ import { ContactsPage } from "@/pages/contacts";
 import { DealPage } from "@/pages/deal";
 import { DealsPage } from "@/pages/deals";
 import { DialogsPage } from "@/pages/dialogs";
+import { SchedulePage } from "@/pages/schedule";
 import { TasksPage } from "@/pages/tasks";
+import { UnitsPage } from "@/pages/units";
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const me = useMe();
@@ -44,6 +46,8 @@ export function App() {
         <Route path="/dialogs" element={<DialogsPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/contacts/:id" element={<ContactPage />} />
+        <Route path="/units" element={<UnitsPage />} />
+        <Route path="/schedule" element={<SchedulePage />} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="/settings" element={<SettingsPage />} />

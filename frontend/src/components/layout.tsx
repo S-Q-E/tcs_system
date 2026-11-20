@@ -1,6 +1,8 @@
 import {
   BarChart3,
   Bell,
+  Building2,
+  CalendarClock,
   Coins,
   LogOut,
   MessagesSquare,
@@ -28,6 +30,8 @@ const NAV = [
   { to: "/deals", label: "Deals", icon: Coins, adminOnly: false },
   { to: "/dialogs", label: "Dialogs", icon: MessagesSquare, adminOnly: false },
   { to: "/contacts", label: "Contacts", icon: Users, adminOnly: false },
+  { to: "/units", label: "Units", icon: Building2, adminOnly: false },
+  { to: "/schedule", label: "Schedule", icon: CalendarClock, adminOnly: false },
   { to: "/tasks", label: "Tasks", icon: Bell, adminOnly: false },
   { to: "/analytics", label: "Analytics", icon: BarChart3, adminOnly: false },
   { to: "/settings", label: "Settings", icon: Settings, adminOnly: false },

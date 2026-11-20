@@ -16,6 +16,7 @@ import {
 } from "@/api/deals";
 import { useCreateTask } from "@/api/timeline";
 import { Timeline } from "@/components/deals/timeline";
+import { DealViewingPanel } from "@/components/deals/viewing-panel";
 import { ChatPanel } from "@/components/dialogs/chat-panel";
 import { LostReasonModal, NoteModal, WonConfirmModal } from "@/components/deals/modals";
 import { useToast, toastError } from "@/components/toast";
@@ -306,6 +307,8 @@ export function DealDetail({ dealId, onClose }: { dealId: string; onClose?: () =
         <Field label="Stage">
           <StageSelect deal={deal} onChange={changeStage} />
         </Field>
+
+        <DealViewingPanel deal={deal} contact={contact} />
 
         <div>
           <p className="mb-1 text-sm font-medium text-slate-600 dark:text-slate-300">Tags</p>

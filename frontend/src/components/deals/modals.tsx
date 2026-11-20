@@ -6,7 +6,7 @@ import { useToast, toastError } from "@/components/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-function ModalShell({
+export function ModalShell({
   title,
   children,
   onClose,

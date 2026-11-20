@@ -46,7 +46,9 @@ from .routers import (
     tags,
     tasks,
     trash,
+    units,
     users,
+    viewings,
     views,
 )
 from .routers.data_exchange import fail_stale_imports
@@ -58,6 +60,7 @@ from .session_middleware import SessionAuthMiddleware
 from .workers.notify_worker import NOTIFY_INTERVAL_SECONDS, notify_loop
 from .workers.outbox_worker import outbox_loop
 from .workers.realtime_poller import POLL_INTERVAL_SECONDS, realtime_loop
+from .workers.slots_worker import SLOTS_INTERVAL_SECONDS, slots_loop
 from .workers.sync_worker import sync_loop
 
 logger = logging.getLogger(__name__)
@@ -115,11 +118,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await try_bootstrap(app.state.session_factory, settings.admin_email, settings.admin_password)
     await fail_stale_imports(app.state.session_factory)
     sync_task = None
+    slots_task = None
     if settings.sync_enabled:
         sync_task = asyncio.create_task(
             sync_loop(app.state.session_factory, settings.sync_interval_seconds)
         )
+        slots_task = asyncio.create_task(
+            slots_loop(app.state.session_factory, SLOTS_INTERVAL_SECONDS)
+        )
     app.state.sync_task = sync_task
+    app.state.slots_task = slots_task
     notify_task = None
     if settings.notifications_enabled:
         notify_task = asyncio.create_task(
@@ -138,7 +146,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             realtime_loop(app.state.session_factory, bus, POLL_INTERVAL_SECONDS)
         )
     app.state.realtime_task = realtime_task
-    for background in (sync_task, notify_task, outbox_task, realtime_task):
+    for background in (sync_task, slots_task, notify_task, outbox_task, realtime_task):
         if background is not None:
             background.add_done_callback(_log_unexpected_end)
     try:
@@ -146,7 +154,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     finally:
         # Cancel loops, then wait bounded so a stuck worker cannot hang
         # the deploy forever; the pool is disposed no matter what.
-        tasks = [t for t in (sync_task, notify_task, outbox_task, realtime_task) if t is not None]
+        tasks = [
+            t
+            for t in (sync_task, slots_task, notify_task, outbox_task, realtime_task)
+            if t is not None
+        ]
         for task in tasks:
             task.cancel()
         if tasks:
@@ -230,6 +242,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(stream.router)
     app.include_router(settings_router)
     app.include_router(notifications.router)
+    app.include_router(units.router)
+    app.include_router(viewings.slots_router)
+    app.include_router(viewings.bookings_router)
 
     @app.get("/")
     async def root_index():

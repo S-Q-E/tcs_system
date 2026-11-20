@@ -100,7 +100,9 @@ async def test_units_crud_duplicate_soft_delete_and_activity_log(client, setting
     assert dup.json()["error"]["code"] == "UNIT_EXISTS"
 
     # Filter & list
-    listed = await client.get(f"/api/units?building={building}&status=available&beds=2&max_rent=2200")
+    listed = await client.get(
+        f"/api/units?building={building}&status=available&beds=2&max_rent=2200"
+    )
     assert listed.status_code == 200
     assert any(u["id"] == unit_id for u in listed.json()["items"])
 
@@ -280,7 +282,9 @@ async def test_slots_bookings_errors_and_manager_permissions(client, settings):
     ).status_code == 403
     assert (
         await client.post(
-            "/api/viewing-slots", json={"starts_at": (t2 + timedelta(hours=1)).isoformat()}, headers=mgr_headers
+            "/api/viewing-slots",
+            json={"starts_at": (t2 + timedelta(hours=1)).isoformat()},
+            headers=mgr_headers,
         )
     ).status_code == 403
     assert (

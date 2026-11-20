@@ -131,7 +131,9 @@ def apply_unit_mapping(
     return records, errors
 
 
-def validate_unit_record(raw: dict[str, str | None], row_no: int) -> tuple[dict | None, dict | None]:
+def validate_unit_record(
+    raw: dict[str, str | None], row_no: int
+) -> tuple[dict | None, dict | None]:
     building = (raw.get("building") or "").strip()
     unit_number = (raw.get("unit_number") or "").strip()
     if not building or not unit_number:

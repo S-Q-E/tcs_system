@@ -64,7 +64,6 @@ from .tasks import (
     VALID_TASK_TYPES,
     CrmTask,
 )
-from .views import CrmSavedView
 from .viewings import (
     ACTIVE_BOOKING_STATUSES,
     BOOKING_STATUS_CANCELLED,
@@ -84,6 +83,7 @@ from .viewings import (
     CrmViewingBooking,
     CrmViewingSlot,
 )
+from .views import CrmSavedView
 
 __all__ = [
     "ACTIVE_BOOKING_STATUSES",

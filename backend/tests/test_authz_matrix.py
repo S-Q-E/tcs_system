@@ -58,9 +58,19 @@ ADMIN_ONLY = frozenset(
         ("GET", "/api/settings/integrations"),
         ("DELETE", "/api/tags/{tag_id}"),
         ("GET", "/api/trash"),
+        ("POST", "/api/units"),
+        ("PATCH", "/api/units/{unit_id}"),
+        ("DELETE", "/api/units/{unit_id}"),
+        ("POST", "/api/units/import/preview"),
+        ("POST", "/api/units/import"),
+        ("GET", "/api/units/import/{job_id}"),
         ("POST", "/api/users"),
         ("GET", "/api/users/{user_id}"),
         ("PATCH", "/api/users/{user_id}"),
+        ("POST", "/api/viewing-slots"),
+        ("POST", "/api/viewing-slots/generate"),
+        ("PATCH", "/api/viewing-slots/{slot_id}"),
+        ("DELETE", "/api/viewing-slots/{slot_id}"),
     }
 )
 
@@ -81,6 +91,22 @@ def _valid_admin_body(template: str) -> dict:
         return {"ordered_ids": [DUMMY_UUID]}
     if template == "/api/chats/quick-replies":
         return {"title": "probe", "body": "probe"}
+    if template == "/api/units":
+        return {
+            "building": "Probe",
+            "unit_number": "101",
+            "beds": 1,
+            "baths": 1,
+            "rent_usd": 1500,
+        }
+    if template == "/api/units/{unit_id}":
+        return {"status": "hidden"}
+    if template == "/api/viewing-slots":
+        return {"starts_at": "2030-01-01T15:00:00Z"}
+    if template == "/api/viewing-slots/generate":
+        return {"days": 7}
+    if template == "/api/viewing-slots/{slot_id}":
+        return {"status": "blocked"}
     if template == "/api/users":
         return {
             "email": "probe@example.com",
@@ -154,9 +180,18 @@ async def test_manager_matrix_admin_403_else_allowed(client, app, settings):
             elif method == "DELETE":
                 response = await mgr.client.delete(url, headers=headers)
             elif (method, template) in ADMIN_ONLY:
-                response = await mgr.client.request(
-                    method, url, json=_valid_admin_body(template), headers=headers
-                )
+                if template in ("/api/units/import", "/api/units/import/preview"):
+                    response = await mgr.client.request(
+                        method,
+                        url,
+                        files={"file": ("u.csv", b"building,unit_number\nA,1\n", "text/csv")},
+                        data={"mapping": "{}"},
+                        headers=headers,
+                    )
+                else:
+                    response = await mgr.client.request(
+                        method, url, json=_valid_admin_body(template), headers=headers
+                    )
             else:
                 body = {"body": "probe"} if "messages" in template else {}
                 if template == "/api/contacts" and method == "POST":

@@ -86,6 +86,9 @@ async def test_migrate_creates_only_version_table(settings):
                 "tcs_crm_outbox",
                 "tcs_crm_quick_replies",
                 "tcs_crm_imports",
+                "tcs_crm_units",
+                "tcs_crm_viewing_slots",
+                "tcs_crm_viewing_bookings",
             }
             # Bot data untouched.
             count = await conn.execute(text("SELECT COUNT(*) FROM tcs_leads"))

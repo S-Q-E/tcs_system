@@ -166,7 +166,11 @@ BEGIN
          WHERE b.status IN ('pending', 'confirmed')
            AND (
                (v_eff_whatsapp_id IS NOT NULL AND b.whatsapp_id = v_eff_whatsapp_id)
-               OR (v_eff_whatsapp_id IS NULL AND v_eff_deal_id IS NOT NULL AND b.deal_id = v_eff_deal_id)
+               OR (
+                   v_eff_whatsapp_id IS NULL
+                   AND v_eff_deal_id IS NOT NULL
+                   AND b.deal_id = v_eff_deal_id
+               )
            )
          ORDER BY b.created_at DESC
            FOR UPDATE OF b

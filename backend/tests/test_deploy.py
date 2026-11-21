@@ -65,10 +65,14 @@ def test_dockerignore_keeps_secrets_and_weight_out():
     assert "node_modules" in lines
     assert "frontend/dist" in lines
     assert ".venv" in lines
-    assert "tests" in lines
     assert any(line == ".env" or line.startswith(".env") for line in lines)
     for required in ("requirements.txt", "backend", "frontend", "scripts"):
         assert required not in lines, f"{required} must stay in the build context"
+    # Only the schema fixture is needed from tests/; the rest stays out of the image.
+    dockerfile = _read("Dockerfile")
+    assert "COPY tests/fixtures/tcs_schema.sql" in dockerfile
+    assert "COPY tests " not in dockerfile
+    assert "COPY . " not in dockerfile
 
 
 def test_railway_json_production_shape():

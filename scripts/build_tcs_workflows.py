@@ -38,7 +38,7 @@ OUT_REMINDERS = WORKFLOWS / "tcs_reminders.json"
 
 TELEGRAM_CREDS = {"telegramApi": {"id": "Bl5dMUlxAbvjD5e5", "name": "tcs demo bot"}}
 POSTGRES_CREDS = {"postgres": {"id": "8geagl0wTR2yx7go", "name": "postgres demo"}}
-TOOLS_MIN = ("search_units", "get_slots", "book_viewing", "handoff_to_human")
+TOOLS_MIN = ("search_units", "get_slots", "book_viewing", "cancel_viewing", "handoff_to_human")
 
 TCS_STAGES = [
     "NEW_INQUIRY",
@@ -397,33 +397,57 @@ let reply = (typeof agentOutput.reply === 'string' && agentOutput.reply.trim().l
 let newStage = allowedStages.includes(agentOutput.new_stage) ? agentOutput.new_stage : lead.current_stage;
 let action = allowedActions.includes(agentOutput.action) ? agentOutput.action : 'none';
 const collected = (agentOutput.collected_data && typeof agentOutput.collected_data === 'object') ? agentOutput.collected_data : {};
-const collectedLeadData = (collected.lead_data && typeof collected.lead_data === 'object') ? collected.lead_data : {};
+const rawLeadData = (collected.lead_data && typeof collected.lead_data === 'object') ? collected.lead_data : {};
+
+// Never overwrite a known value with an empty one: drop "", null and 0.
+const collectedLeadData = {};
+for (const [key, value] of Object.entries(rawLeadData)) {
+  if (value === null || value === undefined) continue;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '') continue;
+    collectedLeadData[key] = trimmed;
+    continue;
+  }
+  if (typeof value === 'number' && value === 0) continue;
+  collectedLeadData[key] = value;
+}
+
 const confidence = (typeof agentOutput.confidence === 'number') ? agentOutput.confidence : 0.5;
 const internalNote = (typeof agentOutput.internal_note === 'string') ? agentOutput.internal_note : '';
 
+// Mirror the Update Lead State SQL guard: a booked future viewing is not downgraded.
+const trialAt = lead.trial_datetime ? new Date(lead.trial_datetime).getTime() : null;
+const bookedInFuture = lead.current_stage === 'VIEWING_SCHEDULED'
+  && trialAt !== null && !Number.isNaN(trialAt) && trialAt > Date.now();
+const effectiveStage = (bookedInFuture && ['NEW_INQUIRY', 'QUALIFIED'].includes(newStage))
+  ? lead.current_stage
+  : newStage;
+
 let status = lead.status;
-if (newStage === 'VIEWING_SCHEDULED') status = 'VIEWING_BOOKED';
-else if (action === 'transfer_to_manager') status = 'HANDOFF';
+if (action === 'transfer_to_manager') status = 'HANDOFF';
+else if (effectiveStage === 'VIEWING_SCHEDULED') status = 'VIEWING_BOOKED';
 else if (action === 'mark_lost') status = 'LOST';
 else if (action === 'mark_won') status = 'LEASED';
 else if (action === 'set_followup') status = 'THINKING';
 
 const events = [];
-if (newStage !== lead.current_stage) {
-  events.push({event_type: 'stage_exited', from_stage: lead.current_stage, to_stage: newStage, payload: {}});
-  events.push({event_type: 'stage_entered', from_stage: lead.current_stage, to_stage: newStage, payload: {}});
+if (effectiveStage !== lead.current_stage) {
+  events.push({event_type: 'stage_exited', from_stage: lead.current_stage, to_stage: effectiveStage, payload: {}});
+  events.push({event_type: 'stage_entered', from_stage: lead.current_stage, to_stage: effectiveStage, payload: {}});
 }
 if (collected.last_objection) {
-  events.push({event_type: 'objection_raised', from_stage: lead.current_stage, to_stage: newStage, payload: {objection: collected.last_objection}});
+  events.push({event_type: 'objection_raised', from_stage: lead.current_stage, to_stage: effectiveStage, payload: {objection: collected.last_objection}});
 }
-if (action === 'transfer_to_manager') events.push({event_type: 'transferred_to_manager', from_stage: lead.current_stage, to_stage: newStage, payload: {reason: internalNote}});
-if (action === 'set_followup') events.push({event_type: 'followup_sent', from_stage: lead.current_stage, to_stage: newStage, payload: {}});
-if (action === 'mark_lost') events.push({event_type: 'lead_lost', from_stage: lead.current_stage, to_stage: newStage, payload: {reason: internalNote}});
-if (action === 'mark_won') events.push({event_type: 'sale_won', from_stage: lead.current_stage, to_stage: newStage, payload: {}});
+// One handoff event: handoff_to_human no longer writes its own.
+if (action === 'transfer_to_manager') events.push({event_type: 'transferred_to_manager', from_stage: lead.current_stage, to_stage: effectiveStage, payload: {reason: internalNote}});
+if (action === 'set_followup') events.push({event_type: 'followup_sent', from_stage: lead.current_stage, to_stage: effectiveStage, payload: {}});
+if (action === 'mark_lost') events.push({event_type: 'lead_lost', from_stage: lead.current_stage, to_stage: effectiveStage, payload: {reason: internalNote}});
+if (action === 'mark_won') events.push({event_type: 'sale_won', from_stage: lead.current_stage, to_stage: effectiveStage, payload: {}});
 
 return [{
   json: {
-    reply, new_stage: newStage, previous_stage: lead.current_stage, action, status,
+    reply, new_stage: effectiveStage, previous_stage: lead.current_stage, action, status,
     collected_data: collected, lead_data: collectedLeadData, confidence,
     internal_note: internalNote, events, response_time_ms: responseTimeMs
   }
@@ -663,7 +687,13 @@ whatsapp_id: {{ $('Upsert & Load Lead State').item.json.whatsapp_id }}
                 "for (const item of $('Load Booked Slots').all()) {\n"
                 "  if (item.json && item.json.trial_datetime) booked.push(item.json);\n"
                 "}\n"
-                "return [{ json: { booked_slots: booked, started_at: new Date().toISOString() } }];"
+                "const now = new Date();\n"
+                "const todayEt = new Intl.DateTimeFormat('en-US', {\n"
+                "  timeZone: 'America/New_York', weekday: 'long', year: 'numeric',\n"
+                "  month: 'long', day: 'numeric'\n"
+                "}).format(now);\n"
+                "return [{ json: { booked_slots: booked, started_at: now.toISOString(),\n"
+                "  today_et: todayEt, timezone: 'America/New_York' } }];"
             },
         )
     )
@@ -739,7 +769,10 @@ whatsapp_id: {{ $('Upsert & Load Lead State').item.json.whatsapp_id }}
                 " AND status = 'VIEWING_BOOKED'"
                 " AND $4 NOT IN ('VIEWING_BOOKED', 'HANDOFF', 'LEASED', 'LOST')"
                 " THEN status ELSE $4 END,"
-                " lead_data = COALESCE(lead_data, '{}'::jsonb) || $5::jsonb,"
+                " lead_data = COALESCE(lead_data, '{}'::jsonb) || COALESCE(("
+                " SELECT jsonb_object_agg(key, value) FROM jsonb_each($5::jsonb)"
+                " WHERE value NOT IN ('null'::jsonb, '\"\"'::jsonb, '0'::jsonb)"
+                "), '{}'::jsonb),"
                 " last_objection = COALESCE(NULLIF($6, ''), last_objection),"
                 " direction = COALESCE(NULLIF($7, ''), direction),"
                 " goal = COALESCE(NULLIF($8, ''), goal),"
@@ -951,11 +984,13 @@ whatsapp_id: {{ $('Upsert & Load Lead State').item.json.whatsapp_id }}
                 "options": {
                     "queryReplacement": "={{ [ $fromAI('beds', 'Bedrooms wanted (integer) or null',"
                     " 'number', null), $fromAI('max_rent', 'Maximum monthly rent in USD or null',"
-                    " 'number', null), $fromAI('pets', 'true when the person has a pet or null',"
-                    " 'boolean', null) ] }}"
+                    " 'number', null), $fromAI('pet_type', \"Pet type: 'dog', 'cat' or 'none'\","
+                    " 'string', '') ] }}"
                 },
                 "toolDescription": "Search available apartments in TCS Property Management"
-                " (returns unit_id, building, unit_number, beds, baths, rent_usd, pets_policy).",
+                " (returns unit_id, building, unit_number, beds, baths, rent_usd,"
+                " allows_dogs, allows_cats). Pass pet_type='dog' when the client has a dog,"
+                " 'cat' for a cat, otherwise 'none'.",
             },
             credentials=POSTGRES_CREDS,
         )
@@ -1035,6 +1070,27 @@ whatsapp_id: {{ $('Upsert & Load Lead State').item.json.whatsapp_id }}
         )
     )
     nodes.append(
+        node(
+            "cancel_viewing",
+            "n8n-nodes-base.postgresTool",
+            2.8,
+            [2960, 700],
+            {
+                "descriptionType": "manual",
+                "operation": "executeQuery",
+                "query": read_spec_block("## 5. cancel_viewing", "sql"),
+                "options": {
+                    "queryReplacement": "={{ [ $('Normalize Message').item.json.whatsapp_id,"
+                    " $fromAI('reason', 'Why the client wants to cancel', 'string', '') ] }}"
+                },
+                "toolDescription": "Cancel the client's active viewing via"
+                " tcs_crm_cancel_viewing. Returns 'cancelled' or 'no_active_booking'."
+                " Say cancelled only when result is cancelled.",
+            },
+            credentials=POSTGRES_CREDS,
+        )
+    )
+    nodes.append(
         sticky(
             "Sticky - setup",
             "## TCS Leasing Bot (Telegram)\n"
@@ -1042,8 +1098,8 @@ whatsapp_id: {{ $('Upsert & Load Lead State').item.json.whatsapp_id }}
             "   `Postgres account` (demo DB), `Telegram account` (NEW demo bot),"
             " `OpenRouter account` (model).\n"
             "2. MANUAL after import (see HUMAN_TODO.md): verify the Telegram Trigger"
-            " output shape, the Postgres Tool nodes (search_units, book_viewing,"
-            " handoff_to_human) and the Code Tool get_slots. Rebuild them from"
+            " output shape and the Postgres Tool nodes (search_units, book_viewing,"
+            " cancel_viewing, handoff_to_human). Rebuild them from"
             " docs/tcs/tools-spec.md if your n8n version differs.\n"
             "3. Schema and demo data come from scripts/seed_tcs_demo.py; do not run"
             " schema nodes here.\n"
@@ -1163,6 +1219,19 @@ ORDER BY l.trial_datetime;
             alwaysOutputData=True,
         ),
         node(
+            "Has Reminders?",
+            "n8n-nodes-base.code",
+            2,
+            [360, 300],
+            {
+                "jsCode": "const out = [];\n"
+                "for (const item of $input.all()) {\n"
+                "  if (item.json && item.json.whatsapp_id) out.push(item);\n"
+                "}\n"
+                "return out;"
+            },
+        ),
+        node(
             "Send Reminder",
             "n8n-nodes-base.telegram",
             1.2,
@@ -1221,7 +1290,8 @@ ORDER BY l.trial_datetime;
     ]
     conns: dict = {}
     link(conns, "Every 15 Minutes", ["Find Upcoming Viewings"])
-    link(conns, "Find Upcoming Viewings", ["Send Reminder"])
+    link(conns, "Find Upcoming Viewings", ["Has Reminders?"])
+    link(conns, "Has Reminders?", ["Send Reminder"])
     link(conns, "Send Reminder", ["Mark Reminder Sent & Log"], output=0)
     link(conns, "Send Reminder", ["Reminder Failed - skip"], output=1)
     return workflow("TCS Viewing Reminders", nodes, conns)

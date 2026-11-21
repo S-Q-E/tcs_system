@@ -5,6 +5,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -84,6 +85,8 @@ class CrmUnit(Base):
     deposit_usd: Mapped[int | None] = mapped_column(Integer, nullable=True)
     available_from: Mapped[date | None] = mapped_column(Date, nullable=True)
     pets_policy: Mapped[str | None] = mapped_column(Text, nullable=True)
+    allows_dogs: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    allows_cats: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default=UNIT_STATUS_AVAILABLE
@@ -137,9 +140,7 @@ class CrmViewingSlot(Base):
         ForeignKey("tcs_crm_units.id", ondelete="SET NULL"),
         nullable=True,
     )
-    status: Mapped[str] = mapped_column(
-        String(16), nullable=False, server_default=SLOT_STATUS_OPEN
-    )
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default=SLOT_STATUS_OPEN)
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("tcs_crm_users.id", ondelete="SET NULL"),

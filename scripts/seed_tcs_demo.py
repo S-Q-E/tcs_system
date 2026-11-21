@@ -204,6 +204,8 @@ async def seed_units(conn: asyncpg.Connection) -> int:
                 status = "leased"
                 leased_planned += 1
             pets = PET_POLICIES[unit_index % len(PET_POLICIES)]
+            allows_dogs = "dog" in pets.lower() and "no dog" not in pets.lower()
+            allows_cats = "cat" in pets.lower() and "no cat" not in pets.lower()
             description = (
                 f"{beds}BR/{baths}BA demo unit with {pets.lower()}. "
                 "Fictional listing for the TCS demo."
@@ -219,6 +221,8 @@ async def seed_units(conn: asyncpg.Connection) -> int:
                     available,
                     status,
                     pets,
+                    allows_dogs,
+                    allows_cats,
                     description,
                 )
             )
@@ -226,8 +230,9 @@ async def seed_units(conn: asyncpg.Connection) -> int:
         """
         INSERT INTO tcs_crm_units (
             building, unit_number, beds, baths, rent_usd, deposit_usd,
-            available_from, status, pets_policy, description
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            available_from, status, pets_policy, allows_dogs, allows_cats,
+            description
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         ON CONFLICT (building, unit_number) WHERE deleted_at IS NULL DO NOTHING
         """,
         rows,

@@ -23,6 +23,8 @@ class UnitOut(BaseModel):
     deposit_usd: int | None
     available_from: date | None
     pets_policy: str | None
+    allows_dogs: bool
+    allows_cats: bool
     description: str | None
     status: str
     photos: list[str]
@@ -42,6 +44,8 @@ class UnitCreate(BaseModel):
     deposit_usd: int | None = Field(default=None, ge=0)
     available_from: date | None = None
     pets_policy: str | None = Field(default=None, max_length=500)
+    allows_dogs: bool | None = None
+    allows_cats: bool | None = None
     description: str | None = Field(default=None, max_length=4000)
     status: UnitStatus = "available"
     photos: list[str] = Field(default_factory=list, max_length=30)
@@ -56,6 +60,8 @@ class UnitUpdate(BaseModel):
     deposit_usd: int | None = Field(default=None, ge=0)
     available_from: date | None = None
     pets_policy: str | None = Field(default=None, max_length=500)
+    allows_dogs: bool | None = None
+    allows_cats: bool | None = None
     description: str | None = Field(default=None, max_length=4000)
     status: UnitStatus | None = None
     photos: list[str] | None = Field(default=None, max_length=30)

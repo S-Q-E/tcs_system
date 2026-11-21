@@ -240,8 +240,20 @@ function UnitsListView({ isAdmin }: { isAdmin: boolean }) {
                   {u.deposit_usd != null ? `$${u.deposit_usd.toLocaleString()}` : "—"}
                 </td>
                 <td className="p-2.5">{u.available_from ?? "—"}</td>
-                <td className="max-w-44 truncate p-2.5 text-xs text-slate-600 dark:text-slate-300">
-                  {u.pets_policy ?? "—"}
+                <td className="max-w-44 p-2.5 text-xs text-slate-600 dark:text-slate-300">
+                  <div className="truncate">{u.pets_policy ?? "—"}</div>
+                  <div className="mt-0.5 flex gap-1">
+                    {u.allows_dogs && (
+                      <span className="rounded bg-emerald-50 px-1 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                        dogs
+                      </span>
+                    )}
+                    {u.allows_cats && (
+                      <span className="rounded bg-emerald-50 px-1 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                        cats
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="p-2.5">
                   {isAdmin ? (
@@ -344,6 +356,8 @@ function UnitFormModal({ unit, onClose }: { unit: Unit | null; onClose: () => vo
   const [depositUsd, setDepositUsd] = useState(unit?.deposit_usd != null ? String(unit.deposit_usd) : "");
   const [availableFrom, setAvailableFrom] = useState(unit?.available_from ?? "");
   const [petsPolicy, setPetsPolicy] = useState(unit?.pets_policy ?? "");
+  const [allowsDogs, setAllowsDogs] = useState(unit?.allows_dogs ?? false);
+  const [allowsCats, setAllowsCats] = useState(unit?.allows_cats ?? false);
   const [description, setDescription] = useState(unit?.description ?? "");
   const [status, setStatus] = useState<UnitStatus>(unit?.status ?? "available");
 
@@ -360,6 +374,8 @@ function UnitFormModal({ unit, onClose }: { unit: Unit | null; onClose: () => vo
       deposit_usd: depositUsd !== "" ? Number(depositUsd) : null,
       available_from: availableFrom || null,
       pets_policy: petsPolicy.trim() || null,
+      allows_dogs: allowsDogs,
+      allows_cats: allowsCats,
       description: description.trim() || null,
       status,
     };
@@ -470,6 +486,24 @@ function UnitFormModal({ unit, onClose }: { unit: Unit | null; onClose: () => vo
             onChange={(e) => setPetsPolicy(e.target.value)}
           />
         </label>
+        <div className="flex gap-4 text-sm">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={allowsDogs}
+              onChange={(e) => setAllowsDogs(e.target.checked)}
+            />
+            Dogs allowed
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={allowsCats}
+              onChange={(e) => setAllowsCats(e.target.checked)}
+            />
+            Cats allowed
+          </label>
+        </div>
         <label className="block">
           Description
           <textarea

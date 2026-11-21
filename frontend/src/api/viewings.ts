@@ -16,6 +16,8 @@ export interface Unit {
   deposit_usd: number | null;
   available_from: string | null;
   pets_policy: string | null;
+  allows_dogs: boolean;
+  allows_cats: boolean;
   description: string | null;
   status: UnitStatus;
   photos: string[];
@@ -43,6 +45,8 @@ export interface UnitCreateInput {
   deposit_usd?: number | null;
   available_from?: string | null;
   pets_policy?: string | null;
+  allows_dogs?: boolean;
+  allows_cats?: boolean;
   description?: string | null;
   status?: UnitStatus;
 }

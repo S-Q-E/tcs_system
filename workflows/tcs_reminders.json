@@ -45,6 +45,19 @@
     },
     {
       "parameters": {
+        "jsCode": "const out = [];\nfor (const item of $input.all()) {\n  if (item.json && item.json.whatsapp_id) out.push(item);\n}\nreturn out;"
+      },
+      "id": "bf6faac2-44da-57f3-836a-ee81fa055f45",
+      "name": "Has Reminders?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        360,
+        300
+      ]
+    },
+    {
+      "parameters": {
         "chatId": "={{ String($json.whatsapp_id).replace(/^tg:/, '') }}",
         "text": "={{ $json.reminder_text }}",
         "additionalFields": {
@@ -135,6 +148,17 @@
       ]
     },
     "Find Upcoming Viewings": {
+      "main": [
+        [
+          {
+            "node": "Has Reminders?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Reminders?": {
       "main": [
         [
           {

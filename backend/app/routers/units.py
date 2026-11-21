@@ -35,6 +35,16 @@ require_admin = require_role("admin")
 _unit_import_tasks: set[asyncio.Task] = set()
 
 
+def _pet_flags(policy: str | None) -> tuple[bool, bool]:
+    """Derive (allows_dogs, allows_cats) from the free-text pets policy."""
+    text = (policy or "").strip().lower()
+    if not text or text.startswith("no pets"):
+        return False, False
+    dogs = "dog" in text and "no dog" not in text
+    cats = "cat" in text and "no cat" not in text
+    return dogs, cats
+
+
 def _unit_snapshot(unit: CrmUnit) -> dict:
     return slim(
         {
@@ -46,6 +56,8 @@ def _unit_snapshot(unit: CrmUnit) -> dict:
             "deposit_usd": unit.deposit_usd,
             "available_from": unit.available_from,
             "pets_policy": unit.pets_policy,
+            "allows_dogs": unit.allows_dogs,
+            "allows_cats": unit.allows_cats,
             "description": unit.description,
             "status": unit.status,
         }
@@ -121,6 +133,7 @@ async def create_unit(
     admin: CurrentUser = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ):
+    derived_dogs, derived_cats = _pet_flags(payload.pets_policy)
     unit = CrmUnit(
         building=payload.building.strip(),
         unit_number=payload.unit_number.strip(),
@@ -130,6 +143,8 @@ async def create_unit(
         deposit_usd=payload.deposit_usd,
         available_from=payload.available_from,
         pets_policy=payload.pets_policy.strip() if payload.pets_policy else None,
+        allows_dogs=payload.allows_dogs if payload.allows_dogs is not None else derived_dogs,
+        allows_cats=payload.allows_cats if payload.allows_cats is not None else derived_cats,
         description=payload.description.strip() if payload.description else None,
         status=payload.status,
         photos=payload.photos,
@@ -181,8 +196,17 @@ async def update_unit(
         unit.deposit_usd = payload.deposit_usd
     if "available_from" in fields:
         unit.available_from = payload.available_from
-    if "pets_policy" in fields:
+    policy_changed = "pets_policy" in fields
+    if policy_changed:
         unit.pets_policy = payload.pets_policy.strip() if payload.pets_policy else None
+    if "allows_dogs" in fields and payload.allows_dogs is not None:
+        unit.allows_dogs = payload.allows_dogs
+    elif policy_changed:
+        unit.allows_dogs = _pet_flags(unit.pets_policy)[0]
+    if "allows_cats" in fields and payload.allows_cats is not None:
+        unit.allows_cats = payload.allows_cats
+    elif policy_changed:
+        unit.allows_cats = _pet_flags(unit.pets_policy)[1]
     if "description" in fields:
         unit.description = payload.description.strip() if payload.description else None
     if "status" in fields and payload.status is not None:
@@ -395,6 +419,7 @@ async def _execute_unit_import_job(job_id: str, factory) -> None:
                     if record.get("available_from")
                     else None
                 )
+                derived_dogs, derived_cats = _pet_flags(record.get("pets_policy"))
                 async with session.begin_nested():
                     unit = CrmUnit(
                         building=record["building"],
@@ -405,6 +430,8 @@ async def _execute_unit_import_job(job_id: str, factory) -> None:
                         deposit_usd=record.get("deposit_usd"),
                         available_from=avail,
                         pets_policy=record.get("pets_policy"),
+                        allows_dogs=derived_dogs,
+                        allows_cats=derived_cats,
                         description=record.get("description"),
                         status=record.get("status") or "available",
                         photos=[],

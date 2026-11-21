@@ -89,9 +89,62 @@ def test_bot_workflow_targets_tcs_tables_only():
 def test_bot_prompt_is_the_documented_prompt():
     prompt = (ROOT / "docs" / "tcs" / "bot-prompt.md").read_text(encoding="utf-8").rstrip()
     agent = next(n for n in _workflow(BOT)["nodes"] if n["name"] == "AI Agent")
-    assert agent["parameters"]["text"].startswith("=" + prompt)
+    # The system prompt is systemMessage; `text` is the incoming user message.
+    assert agent["parameters"]["text"] == "={{ $('Normalize Message').item.json.text }}"
+    assert agent["parameters"]["options"]["systemMessage"].startswith("=" + prompt)
     assert "get_slots" in prompt
     assert "handoff_to_human" in prompt
+
+
+def test_bot_prompt_handoff_guardrails():
+    prompt = (ROOT / "docs" / "tcs" / "bot-prompt.md").read_text(encoding="utf-8")
+    # Empty slots must be explained, never escalated.
+    assert "empty list, do NOT hand off" in prompt
+    assert "Monday-Friday, 10:00-17:00 ET" in prompt
+    # Handoff only for an explicit request, a complaint, or two tool failures.
+    assert "explicitly asks for a human" in prompt
+    assert "complains" in prompt
+    assert "two tool calls in a row failed" in prompt
+    # A vague request asks one clarifying question instead of handing off.
+    assert "ask ONE question" in prompt
+    # The old unconditional handoff wording is gone.
+    assert "offer to connect the person with a human manager via handoff_to_human" not in prompt
+    assert "If you do not have the answer, say the team will follow up and call" not in prompt
+
+
+def test_get_slots_supports_from_date():
+    data = _workflow(BOT)
+    slots = next(n for n in data["nodes"] if n["name"] == "get_slots")
+    params = slots["parameters"]
+    assert "$fromAI('from_date'" in params["options"]["queryReplacement"]
+    query = params["query"]
+    assert "from_date" in query
+    assert "GREATEST(" in query
+    assert "America/New_York" in query
+    assert "LIMIT 3" in query
+    assert "is not a reason to hand off" in params["toolDescription"]
+    assert "Monday-Friday 10:00-17:00 ET" in params["toolDescription"]
+
+    handoff = next(n for n in data["nodes"] if n["name"] == "handoff_to_human")
+    desc = handoff["parameters"]["toolDescription"]
+    assert "ONLY" in desc
+    assert "empty slot list" in desc
+
+
+def test_bot_behavior_cases_are_documented():
+    cases = (ROOT / "docs" / "tcs" / "bot-behavior-cases.md").read_text(encoding="utf-8")
+    for phrase in (
+        "Sunday, November 23",
+        "I need an apartment",
+        "Can I speak to a manager",
+        "Show me viewings for next week",
+        "returns an error once, then again",
+    ):
+        assert phrase in cases, phrase
+    # Each case states what must not happen (handoff/no-handoff expectations).
+    assert cases.count("| `handoff_to_human`") >= 1
+    assert "| `handoff_to_human`;" in cases
+    assert "Must NOT happen" in cases
 
 
 def test_reminders_every_15_minutes():

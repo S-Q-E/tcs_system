@@ -33,29 +33,51 @@ about availability, price, or building.”
 ## 2. get_slots (Postgres tool)
 
 Goal: return up to 3 open future viewing slots from `tcs_crm_viewing_slots`
-within the next 7 days (ISO 8601 with timezone + `America/New_York` display).
-Optional input from the model: `unit_id` (UUID string or empty). If no slots
-are available, returns an empty list and the bot offers manager handoff.
+within 7 days starting at `from_date` (ISO 8601 with timezone +
+`America/New_York` display). Viewing hours are Monday-Friday 10:00-17:00 ET;
+weekends have no slots.
+
+Optional inputs from the model:
+- `$1` `unit_id` (UUID string or empty)
+- `$2` `from_date` (`YYYY-MM-DD`, default today in `America/New_York`; an
+  empty or malformed value falls back to today, and a past date is clamped to
+  today)
+
+An empty result is NOT a handoff reason: the bot explains the weekday
+10:00-17:00 ET schedule and retries with a later `from_date`. A weekend
+`from_date` still returns the following weekdays because the window is 7 days.
 
 ```sql
-SELECT id AS slot_id,
-       to_char(starts_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS starts_at,
-       to_char(starts_at AT TIME ZONE 'America/New_York', 'Dy Mon DD, HH12:MI AM') || ' ET' AS local_time,
-       duration_min,
-       unit_id
-FROM tcs_crm_viewing_slots
-WHERE status = 'open'
-  AND starts_at > now()
-  AND starts_at <= now() + interval '7 days'
+WITH p AS (
+  SELECT GREATEST(
+           CASE WHEN COALESCE($2::text, '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+                THEN ($2::text)::date
+                ELSE (now() AT TIME ZONE 'America/New_York')::date END,
+           (now() AT TIME ZONE 'America/New_York')::date
+         ) AS from_date
+)
+SELECT s.id AS slot_id,
+       to_char(s.starts_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS starts_at,
+       to_char(s.starts_at AT TIME ZONE 'America/New_York', 'Dy Mon DD, HH12:MI AM') || ' ET' AS local_time,
+       s.duration_min,
+       s.unit_id
+FROM tcs_crm_viewing_slots s, p
+WHERE s.status = 'open'
+  AND s.starts_at > now()
+  AND s.starts_at >= p.from_date::timestamp AT TIME ZONE 'America/New_York'
+  AND s.starts_at < (p.from_date + 8)::timestamp AT TIME ZONE 'America/New_York'
   AND (NULLIF($1::text, '')::uuid IS NULL
-       OR unit_id IS NULL
-       OR unit_id = NULLIF($1::text, '')::uuid)
-ORDER BY starts_at ASC
+       OR s.unit_id IS NULL
+       OR s.unit_id = NULLIF($1::text, '')::uuid)
+ORDER BY s.starts_at ASC
 LIMIT 3;
 ```
 
-Agent-facing description: “Fetch up to 3 open viewing slots in the next 7 days.
-Offer ONLY slots returned by this tool; never invent dates or times.”
+Agent-facing description: “Fetch up to 3 open viewing slots in the 7 days from
+`from_date` (default today). Viewings are Monday-Friday 10:00-17:00 ET. Offer
+ONLY slots returned by this tool; never invent dates or times. An empty list
+means no viewings in that window — explain the weekday schedule and retry with
+a later `from_date`, do not hand off.”
 
 ## 3. book_viewing (Postgres tool)
 
@@ -82,6 +104,12 @@ FROM tcs_crm_book_viewing(
 ```
 
 ## 4. handoff_to_human (Postgres tool)
+
+Agent-facing description: “Hand the conversation to the office team. Call ONLY
+when the person explicitly asks for a human, complains or reports an
+unresolvable problem, after two failed tool calls in a row, or for an
+out-of-scope/accommodation/emergency request. Never call it for an empty slot
+list, an unknown answer, or a vague request.”
 
 Inputs:
 - `$1`: `whatsapp_id` (from `Normalize Message`, NOT from the model)

@@ -669,9 +669,9 @@ whatsapp_id: {{ $('Upsert & Load Lead State').item.json.whatsapp_id }}
     )
     agent_params = {
         "promptType": "define",
-        "text": "=" + prompt + state_block,
+        "text": "={{ $('Normalize Message').item.json.text }}",
         "hasOutputParser": True,
-        "options": {},
+        "options": {"systemMessage": "=" + prompt + state_block},
     }
     nodes.append(
         node(
@@ -972,10 +972,15 @@ whatsapp_id: {{ $('Upsert & Load Lead State').item.json.whatsapp_id }}
                 "query": read_spec_block("## 2. get_slots", "sql"),
                 "options": {
                     "queryReplacement": "={{ [ $fromAI('unit_id',"
-                    " 'Optional unit_id UUID from search_units, or empty string', 'string', '') ] }}"
+                    " 'Optional unit_id UUID from search_units, or empty string', 'string', ''),"
+                    " $fromAI('from_date', 'Optional YYYY-MM-DD start date from the person"
+                    " (default today)', 'string', '') ] }}"
                 },
-                "toolDescription": "Fetch up to 3 open future viewing slots in the next 7 days"
-                " from tcs_crm_viewing_slots. Offer ONLY slots returned by this tool.",
+                "toolDescription": "Fetch up to 3 open viewing slots in the 7 days from from_date"
+                " (default today). Viewings are Monday-Friday 10:00-17:00 ET only. Offer ONLY"
+                " slots returned by this tool; never invent dates or times. An empty list is not"
+                " a reason to hand off: explain the weekday schedule and retry with a later"
+                " from_date.",
             },
             credentials=POSTGRES_CREDS,
         )
@@ -1020,9 +1025,11 @@ whatsapp_id: {{ $('Upsert & Load Lead State').item.json.whatsapp_id }}
                     "queryReplacement": "={{ [ $('Normalize Message').item.json.whatsapp_id,"
                     " $fromAI('reason', 'Why a human is needed', 'string', '') ] }}"
                 },
-                "toolDescription": "Hand the conversation to the office team. Call for"
-                " out-of-scope questions, accommodation requests, emergencies, when no"
-                " slots are available, or when you do not know the answer.",
+                "toolDescription": "Hand the conversation to the office team. Call ONLY when"
+                " the person explicitly asks for a human, complains or reports an"
+                " unresolvable problem, after two failed tool calls in a row, or for an"
+                " out-of-scope/accommodation/emergency request. Never call it for an empty"
+                " slot list, an unknown answer, or a vague request.",
             },
             credentials=POSTGRES_CREDS,
         )

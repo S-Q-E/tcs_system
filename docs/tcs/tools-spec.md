@@ -40,16 +40,17 @@ a dog, 'cat' for a cat, otherwise 'none'.”
 
 ## 2. get_slots (Postgres tool)
 
-Goal: return up to 3 open future viewing slots from `tcs_crm_viewing_slots`
-within 7 days starting at `from_date` (ISO 8601 with timezone +
-`America/New_York` display). Viewing hours are Monday-Friday 10:00-17:00 ET;
-weekends have no slots.
+Goal: return open future viewing slots from `tcs_crm_viewing_slots` within 7
+days starting at `from_date` (ISO 8601 with timezone + `America/New_York`
+display). Default limit 3, maximum 8. Viewing hours are Monday-Friday
+10:00-17:00 ET; weekends have no slots.
 
 Optional inputs from the model:
 - `$1` `unit_id` (UUID string or empty)
 - `$2` `from_date` (`YYYY-MM-DD`, default today in `America/New_York`; an
   empty or malformed value falls back to today, and a past date is clamped to
   today)
+- `$3` `limit` (integer, default 3, clamped to 1..8; empty/malformed -> 3)
 
 An empty result is NOT a handoff reason: the bot explains the weekday
 10:00-17:00 ET schedule and retries with a later `from_date`. A weekend
@@ -78,14 +79,18 @@ WHERE s.status = 'open'
        OR s.unit_id IS NULL
        OR s.unit_id = NULLIF($1::text, '')::uuid)
 ORDER BY s.starts_at ASC
-LIMIT 3;
+LIMIT LEAST(GREATEST(
+  CASE WHEN COALESCE($3::text, '') ~ '^[0-9]+$' THEN ($3::text)::int ELSE 3 END,
+  1), 8);
 ```
 
-Agent-facing description: “Fetch up to 3 open viewing slots in the 7 days from
-`from_date` (default today). Viewings are Monday-Friday 10:00-17:00 ET. Offer
-ONLY slots returned by this tool; never invent dates or times. An empty list
-means no viewings in that window — explain the weekday schedule and retry with
-a later `from_date`, do not hand off.”
+Agent-facing description: “Fetch open viewing slots in the 7 days from
+`from_date` (default today). Default limit 3, maximum 8. Viewings are
+Monday-Friday 10:00-17:00 ET. Offer ONLY slots returned by this tool; never
+invent dates or times. If the person asks to see all slots for a date, pass
+limit=8; otherwise show the earliest available and say other times exist. An
+empty list means no viewings in that window — explain the weekday schedule and
+retry with a later `from_date`, do not hand off.”
 
 ## 3. book_viewing (Postgres tool)
 

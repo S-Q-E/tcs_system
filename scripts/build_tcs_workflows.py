@@ -759,12 +759,14 @@ whatsapp_id: {{ $('Upsert & Load Lead State').item.json.whatsapp_id }}
                 "operation": "executeQuery",
                 "query": "UPDATE tcs_leads SET"
                 " current_stage = CASE"
+                " WHEN $2 = 'VIEWING_SCHEDULED' AND trial_datetime IS NULL THEN current_stage"
                 " WHEN current_stage = 'VIEWING_SCHEDULED' AND trial_datetime > now()"
                 " AND $2 IN ('NEW_INQUIRY', 'QUALIFIED') THEN current_stage ELSE $2 END,"
                 " previous_stage = CASE"
                 " WHEN current_stage = 'VIEWING_SCHEDULED' AND trial_datetime > now()"
                 " AND $2 IN ('NEW_INQUIRY', 'QUALIFIED') THEN previous_stage ELSE $3 END,"
                 " status = CASE"
+                " WHEN $4 = 'VIEWING_BOOKED' AND trial_datetime IS NULL THEN status"
                 " WHEN current_stage = 'VIEWING_SCHEDULED' AND trial_datetime > now()"
                 " AND status = 'VIEWING_BOOKED'"
                 " AND $4 NOT IN ('VIEWING_BOOKED', 'HANDOFF', 'LEASED', 'LOST')"
@@ -1009,13 +1011,16 @@ whatsapp_id: {{ $('Upsert & Load Lead State').item.json.whatsapp_id }}
                     "queryReplacement": "={{ [ $fromAI('unit_id',"
                     " 'Optional unit_id UUID from search_units, or empty string', 'string', ''),"
                     " $fromAI('from_date', 'Optional YYYY-MM-DD start date from the person"
-                    " (default today)', 'string', '') ] }}"
+                    " (default today)', 'string', ''),"
+                    " $fromAI('limit', 'Number of slots to return (default 3, max 8)',"
+                    " 'number', 3) ] }}"
                 },
-                "toolDescription": "Fetch up to 3 open viewing slots in the 7 days from from_date"
-                " (default today). Viewings are Monday-Friday 10:00-17:00 ET only. Offer ONLY"
-                " slots returned by this tool; never invent dates or times. An empty list is not"
-                " a reason to hand off: explain the weekday schedule and retry with a later"
-                " from_date.",
+                "toolDescription": "Fetch open viewing slots in the 7 days from from_date"
+                " (default today). Default limit 3, maximum 8. Viewings are Monday-Friday"
+                " 10:00-17:00 ET only. If the person asks for all slots on a date, pass limit=8;"
+                " otherwise show the earliest and mention other times. Offer ONLY slots returned"
+                " by this tool; never invent dates or times. An empty list is not a reason to"
+                " hand off: explain the weekday schedule and retry with a later from_date.",
             },
             credentials=POSTGRES_CREDS,
         )

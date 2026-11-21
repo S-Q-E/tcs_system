@@ -91,7 +91,7 @@ def test_bot_workflow_targets_tcs_tables_only():
         in nodes["handoff_to_human"]["parameters"]["options"]["queryReplacement"]
     )
     assert "deleted_at IS NULL" in nodes["search_units"]["parameters"]["query"]
-    assert "LIMIT 3" in nodes["get_slots"]["parameters"]["query"]
+    assert "LIMIT LEAST(GREATEST(" in nodes["get_slots"]["parameters"]["query"]
 
     # Pet filter uses explicit flags, not free-text policy.
     search = nodes["search_units"]["parameters"]
@@ -141,8 +141,10 @@ def test_get_slots_supports_from_date():
     query = params["query"]
     assert "from_date" in query
     assert "GREATEST(" in query
+    assert "LIMIT LEAST(GREATEST(" in query
+    assert "$fromAI('limit'" in params["options"]["queryReplacement"]
     assert "America/New_York" in query
-    assert "LIMIT 3" in query
+    assert "LIMIT LEAST(GREATEST(" in query
     assert "is not a reason to hand off" in params["toolDescription"]
     assert "Monday-Friday 10:00-17:00 ET" in params["toolDescription"]
 
@@ -192,6 +194,8 @@ def test_prompt_has_budget_and_cancel_rules():
     assert "never substitute your own number" in prompt
     assert "cancel_viewing" in prompt
     assert "only when it returns result = 'cancelled'" in prompt
+    assert "Do not ask why" in prompt
+    assert "limit=8" in prompt
     assert "Today is {{ $('Build Agent Context').item.json.today_et }}" in prompt
 
 
@@ -476,6 +480,54 @@ async def test_search_units_pet_type_excludes_cats_only(settings):
             none = await conn.fetch(sql, None, None, "none")
             none_ids = {r["unit_id"] for r in none}
             assert {cats_only, both} <= none_ids
+        finally:
+            await tx.rollback()
+    finally:
+        await conn.close()
+
+
+@pytest.mark.usefixtures("db_available", "migrated")
+async def test_update_lead_state_does_not_restore_stage_without_trial(settings):
+    """After a cancel (trial_datetime is NULL) the model's VIEWING_SCHEDULED
+    output must not put the lead back into a booked-viewing state.
+    """
+    data = _workflow(BOT)
+    nodes = {n["name"]: n for n in data["nodes"]}
+    sql = nodes["Update Lead State"]["parameters"]["query"]
+
+    conn = await asyncpg.connect(dsn=settings.dsn)
+    try:
+        tx = conn.transaction()
+        await tx.start()
+        try:
+            wa = f"tg:notrial_{uuid.uuid4().hex[:8]}"
+            await conn.execute(
+                "INSERT INTO tcs_leads (whatsapp_id, name, current_stage, status, lead_data)"
+                " VALUES ($1, 'No Trial', 'QUALIFIED', 'ACTIVE', '{}'::jsonb)",
+                wa,
+            )
+            await conn.execute(
+                sql,
+                wa,
+                "VIEWING_SCHEDULED",
+                "VIEWING_SCHEDULED",
+                "VIEWING_BOOKED",
+                "{}",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "0.8",
+            )
+            row = await conn.fetchrow(
+                "SELECT current_stage, status, trial_datetime"
+                " FROM tcs_leads WHERE whatsapp_id = $1",
+                wa,
+            )
+            assert row["current_stage"] == "QUALIFIED"
+            assert row["status"] == "ACTIVE"
+            assert row["trial_datetime"] is None
         finally:
             await tx.rollback()
     finally:

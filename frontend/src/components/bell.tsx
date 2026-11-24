@@ -40,7 +40,7 @@ export function BellBadge() {
     return null;
   }
   return (
-    <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+    <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-600 px-1 text-[10px] font-semibold text-white ring-2 ring-white dark:bg-brand-500 dark:ring-[#121418]">
       {count > 99 ? "99+" : count}
     </span>
   );
@@ -65,13 +65,13 @@ export function BellDropdown({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="absolute right-0 z-20 mt-2 max-h-96 w-80 overflow-y-auto rounded-md border border-slate-200 bg-white p-2 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-900">
-      <div className="flex items-center justify-between px-2 py-1">
-        <p className="font-medium">Notifications</p>
+    <div className="absolute right-0 z-30 mt-2 max-h-96 w-80 overflow-y-auto rounded-lg border border-slate-200/90 bg-white p-1.5 text-xs shadow-elevated dark:border-slate-800 dark:bg-[#14171E]">
+      <div className="flex items-center justify-between border-b border-slate-100 px-2.5 py-2 dark:border-slate-800/80">
+        <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">Notifications</p>
         {(list.data?.unread_total ?? 0) > 0 && (
           <button
             type="button"
-            className="text-xs text-slate-500 underline"
+            className="text-[11px] font-medium text-brand-600 hover:underline dark:text-brand-400"
             onClick={() =>
               readAll.mutate(undefined, { onError: (error) => toastError(push, error) })
             }
@@ -80,35 +80,49 @@ export function BellDropdown({ onClose }: { onClose: () => void }) {
           </button>
         )}
       </div>
-      {(list.data?.items ?? []).map((notification) => (
-        <button
-          key={notification.id}
-          type="button"
-          onClick={() => open(notification)}
-          className={cn(
-            "block w-full rounded px-2 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-slate-800",
-            !notification.read_at && "bg-slate-50 dark:bg-slate-800/60",
-          )}
-        >
-          <span className="font-medium">{TYPE_LABEL[notification.type] ?? notification.type}</span>
-          <span className="block truncate text-xs text-slate-500">
-            {typeof notification.payload.text === "string"
-              ? notification.payload.text
-              : typeof notification.payload.title === "string"
-                ? notification.payload.title
-                : ""}
-          </span>
-          <span className="block text-[11px] text-slate-400">
-            {formatRelative(notification.created_at)}
-          </span>
-        </button>
-      ))}
+      <div className="my-1 flex flex-col gap-0.5">
+        {(list.data?.items ?? []).map((notification) => (
+          <button
+            key={notification.id}
+            type="button"
+            onClick={() => open(notification)}
+            className={cn(
+              "group flex w-full items-start gap-2 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50",
+              !notification.read_at && "bg-brand-50/40 dark:bg-brand-950/20",
+            )}
+          >
+            <span
+              className={cn(
+                "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full",
+                !notification.read_at ? "bg-brand-500" : "bg-transparent",
+              )}
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block font-medium text-slate-800 dark:text-slate-100">
+                {TYPE_LABEL[notification.type] ?? notification.type}
+              </span>
+              <span className="mt-0.5 block truncate text-[11px] text-slate-500 dark:text-slate-400">
+                {typeof notification.payload.text === "string"
+                  ? notification.payload.text
+                  : typeof notification.payload.title === "string"
+                    ? notification.payload.title
+                    : ""}
+              </span>
+              <span className="mt-0.5 block text-[10px] text-slate-400 dark:text-slate-500">
+                {formatRelative(notification.created_at)}
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
       {(list.data?.items.length ?? 0) === 0 && !list.isPending && (
-        <p className="px-2 py-3 text-slate-500">No notifications yet.</p>
+        <p className="px-2.5 py-6 text-center text-xs text-slate-500">No notifications yet.</p>
       )}
-      <Button variant="ghost" size="sm" className="mt-1 w-full" onClick={onClose}>
-        Close
-      </Button>
+      <div className="border-t border-slate-100 pt-1 dark:border-slate-800/80">
+        <Button variant="ghost" size="sm" className="w-full" onClick={onClose}>
+          Close
+        </Button>
+      </div>
     </div>
   );
 }

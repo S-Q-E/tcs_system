@@ -4,11 +4,11 @@ export function StubPage({ title, hint }: { title: string; hint: string }) {
   const [params] = useSearchParams();
   const query = params.get("q");
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
-      <h1 className="text-xl font-bold">{title}</h1>
-      <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{hint}</p>
+    <div className="ui-card p-6">
+      <h1 className="text-base font-semibold tracking-[-0.015em]">{title}</h1>
+      <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">{hint}</p>
       {query && (
-        <p className="mt-2 text-sm">
+        <p className="mt-2 text-xs">
           Search: <span className="font-medium">{query}</span>
         </p>
       )}
@@ -22,9 +22,9 @@ export function DealsPage() {
 
 export function ForbiddenPage() {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
-      <h1 className="text-xl font-bold">Access denied</h1>
-      <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+    <div className="ui-card p-6">
+      <h1 className="text-base font-semibold tracking-[-0.015em]">Access denied</h1>
+      <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
         This section is available to administrators only.
       </p>
     </div>

@@ -59,9 +59,9 @@ function Card({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+    <section className="ui-card p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="font-semibold">{title}</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">{title}</h2>
         {actions}
       </div>
       {children}

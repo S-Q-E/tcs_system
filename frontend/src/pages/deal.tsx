@@ -11,7 +11,7 @@ export function DealPage() {
     return null;
   }
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto max-w-6xl">
       <Button variant="ghost" size="sm" className="mb-3" onClick={() => navigate("/deals")}>
         ← Back to deals
       </Button>

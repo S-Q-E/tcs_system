@@ -107,9 +107,9 @@ export function ChatPanel({ whatsappId, contactName = null }: ChatPanelProps) {
     return (
       <div className="flex h-full min-h-0 flex-col items-center justify-center">
         {dialog.isPending ? (
-          <p className="text-sm text-slate-500">Loading…</p>
+          <p className="text-xs text-slate-500">Loading…</p>
         ) : (
-          <p className="text-sm text-slate-500">Dialog unavailable.</p>
+          <p className="text-xs text-slate-500">Dialog unavailable.</p>
         )}
       </div>
     );
@@ -117,8 +117,14 @@ export function ChatPanel({ whatsappId, contactName = null }: ChatPanelProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-2 dark:border-slate-800">
-        <span className="min-w-0 flex-1 truncate text-xs text-slate-500 dark:text-slate-400">
+      <div className="flex items-center gap-2 border-b border-slate-200/80 px-3.5 py-2 dark:border-slate-800/80">
+        <span className="inline-flex min-w-0 flex-1 items-center gap-1.5 truncate text-xs font-medium text-slate-600 dark:text-slate-300">
+          <span
+            className={cn(
+              "h-2 w-2 rounded-full",
+              dialog.data.bot_paused ? "bg-amber-500" : "bg-emerald-500",
+            )}
+          />
           {dialog.data.bot_paused ? "Bot paused" : "Bot replying"}
         </span>
         <Button
@@ -132,7 +138,7 @@ export function ChatPanel({ whatsappId, contactName = null }: ChatPanelProps) {
       </div>
 
       {dialog.data.bot_paused && (
-        <div className="flex items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100">
+        <div className="flex items-center justify-between gap-2 border-b border-amber-200/80 bg-amber-50/80 px-3.5 py-2 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
           <span>Bot paused. The prospect will not receive automatic replies.</span>
           <Button
             size="sm"
@@ -145,8 +151,8 @@ export function ChatPanel({ whatsappId, contactName = null }: ChatPanelProps) {
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
-        {messages.isPending && <p className="text-sm text-slate-500">Loading…</p>}
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3.5">
+        {messages.isPending && <p className="text-xs text-slate-500">Loading…</p>}
         {hasMoreOlder && (
           <Button
             size="sm"
@@ -162,14 +168,14 @@ export function ChatPanel({ whatsappId, contactName = null }: ChatPanelProps) {
           <div
             key={message.id}
             className={cn(
-              "max-w-[85%] rounded-lg px-3 py-2 text-sm",
+              "max-w-[85%] rounded-lg px-3 py-2 text-[13px]",
               message.direction === "in"
-                ? "bg-slate-100 dark:bg-slate-800"
-                : "ml-auto bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900",
+                ? "border border-slate-200/80 bg-slate-50 text-slate-800 dark:border-slate-800 dark:bg-[#171A22] dark:text-slate-100"
+                : "ml-auto bg-brand-600 text-white shadow-subtle dark:bg-brand-500",
             )}
           >
-            <p className="whitespace-pre-wrap">{message.content ?? ""}</p>
-            <p className="mt-1 text-[11px] opacity-70">
+            <p className="whitespace-pre-wrap leading-relaxed">{message.content ?? ""}</p>
+            <p className="mt-1 font-mono text-[10px] opacity-75">
               {message.message_type === "manager" ? "Manager · " : ""}
               {message.stage_at_moment ? `${message.stage_at_moment} · ` : ""}
               {formatDate(message.created_at)}
@@ -182,14 +188,14 @@ export function ChatPanel({ whatsappId, contactName = null }: ChatPanelProps) {
             <div
               key={item.id}
               className={cn(
-                "ml-auto max-w-[85%] rounded-lg px-3 py-2 text-sm",
+                "ml-auto max-w-[85%] rounded-lg px-3 py-2 text-[13px]",
                 item.status === "failed"
-                  ? "bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-100"
-                  : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
+                  ? "border border-red-200 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950 dark:text-red-100"
+                  : "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
               )}
             >
               <p className="whitespace-pre-wrap">{item.body}</p>
-              <p className="mt-1 flex items-center gap-2 text-[11px] opacity-80">
+              <p className="mt-1 flex items-center gap-2 font-mono text-[10px] opacity-80">
                 {item.status === "failed" ? "Send failed" : "Queued…"}
                 {formatDate(item.created_at)}
                 {item.status === "failed" && (
@@ -198,7 +204,7 @@ export function ChatPanel({ whatsappId, contactName = null }: ChatPanelProps) {
                     onClick={() => retry(item)}
                     disabled={retryOutbox.isPending}
                     title="The message may already have reached the prospect — a duplicate is possible"
-                    className="font-medium underline underline-offset-2"
+                    className="font-sans font-medium underline underline-offset-2"
                   >
                     Retry (duplicate possible)
                   </button>
@@ -208,7 +214,7 @@ export function ChatPanel({ whatsappId, contactName = null }: ChatPanelProps) {
           ))}
       </div>
 
-      <div className="border-t border-slate-200 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] dark:border-slate-800 md:pb-3">
+      <div className="border-t border-slate-200/80 bg-slate-50/40 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] dark:border-slate-800/80 dark:bg-[#14171D] md:pb-3">
         {quickReplies.data && quickReplies.data.items.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-1">
             {quickReplies.data.items.map((reply) => (
@@ -217,7 +223,7 @@ export function ChatPanel({ whatsappId, contactName = null }: ChatPanelProps) {
                 type="button"
                 title={reply.body}
                 onClick={() => applyQuickReply(reply.body)}
-                className="rounded-full border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                className="rounded-md border border-slate-200/90 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 shadow-subtle transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-[#121418] dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 {reply.title}
               </button>

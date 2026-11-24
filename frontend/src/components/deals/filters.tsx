@@ -64,18 +64,18 @@ export function DealFiltersBar({ filters, onChange }: FiltersProps) {
     });
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200/80 bg-white/80 p-2 shadow-subtle dark:border-slate-800/80 dark:bg-[#121418]/80">
       <Input
         value={filters.search ?? ""}
         onChange={(event) => set({ search: event.target.value })}
         placeholder="Search by title"
-        className="w-48"
+        className="w-44"
       />
       <select
         aria-label="Owner"
         value={filters.owner_id ?? ""}
         onChange={(event) => set({ owner_id: event.target.value || undefined })}
-        className="h-11 md:h-9 rounded-md border border-slate-200 bg-white px-2 text-base md:text-sm dark:border-slate-700 dark:bg-slate-900"
+        className="ui-select"
       >
         <option value="">All owners</option>
         {users.data?.items.map((user) => (
@@ -88,7 +88,7 @@ export function DealFiltersBar({ filters, onChange }: FiltersProps) {
         aria-label="Tag"
         value={filters.tag?.[0] ?? ""}
         onChange={(event) => set({ tag: event.target.value ? [event.target.value] : [] })}
-        className="h-11 md:h-9 rounded-md border border-slate-200 bg-white px-2 text-base md:text-sm dark:border-slate-700 dark:bg-slate-900"
+        className="ui-select"
       >
         <option value="">All tags</option>
         {tags.data?.items.map((tag) => (
@@ -101,7 +101,7 @@ export function DealFiltersBar({ filters, onChange }: FiltersProps) {
         aria-label="Source"
         value={filters.contact_source ?? ""}
         onChange={(event) => set({ contact_source: event.target.value || undefined })}
-        className="h-11 md:h-9 rounded-md border border-slate-200 bg-white px-2 text-base md:text-sm dark:border-slate-700 dark:bg-slate-900"
+        className="ui-select"
       >
         <option value="">All sources</option>
         <option value="bot">Bot</option>
@@ -112,35 +112,40 @@ export function DealFiltersBar({ filters, onChange }: FiltersProps) {
         type="date"
         value={filters.created_from?.slice(0, 10) ?? ""}
         onChange={(event) => set({ created_from: event.target.value || undefined })}
-        className="w-40"
+        className="w-36"
       />
       <Input
         aria-label="Created to"
         type="date"
         value={filters.created_to?.slice(0, 10) ?? ""}
         onChange={(event) => set({ created_to: event.target.value || undefined })}
-        className="w-40"
+        className="w-36"
       />
       <Button variant="ghost" size="sm" onClick={clearAll}>
         Reset
       </Button>
 
-      <span className="mx-1 hidden h-5 w-px bg-slate-200 dark:bg-slate-700 md:block" />
+      <span className="mx-1 hidden h-4 w-px bg-slate-200 dark:bg-slate-800 md:block" />
 
       <div className="flex flex-wrap items-center gap-1">
         {savedViews.data?.items.map((view) => (
           <span
             key={view.id}
-            className="flex items-center gap-1 rounded-full bg-slate-200 py-0.5 pl-2 pr-1 text-xs dark:bg-slate-800"
+            className="inline-flex items-center gap-1 rounded-md border border-slate-200/80 bg-slate-50 py-0.5 pl-2 pr-1 text-xs font-medium text-slate-700 dark:border-slate-800 dark:bg-[#181B22] dark:text-slate-300"
           >
-            <button type="button" onClick={() => applyView(view.filters)} title={view.name}>
+            <button
+              type="button"
+              onClick={() => applyView(view.filters)}
+              title={view.name}
+              className="hover:text-brand-600 dark:hover:text-brand-400"
+            >
               {view.name}
             </button>
             <button
               type="button"
               aria-label={`Delete view ${view.name}`}
               onClick={() => void removeView(view.id)}
-              className="rounded-full px-1 text-slate-500 hover:text-red-600"
+              className="rounded px-1 text-slate-400 hover:text-red-600"
             >
               ×
             </button>

@@ -20,15 +20,17 @@ export function ModalShell({
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl dark:bg-slate-900"
+        className="w-full max-w-md rounded-xl border border-slate-200/90 bg-white p-5 shadow-modal dark:border-slate-800 dark:bg-[#14171E]"
         onClick={(event) => event.stopPropagation()}
       >
-        <h2 className="text-lg font-bold">{title}</h2>
-        <div className="mt-3">{children}</div>
+        <h2 className="text-base font-semibold tracking-[-0.015em] text-slate-900 dark:text-slate-100">
+          {title}
+        </h2>
+        <div className="mt-3.5">{children}</div>
       </div>
     </div>
   );
@@ -49,7 +51,7 @@ export function LostReasonModal({
         aria-label="Lost reason"
         value={reasonId}
         onChange={(event) => setReasonId(event.target.value)}
-        className="h-11 md:h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-base md:text-sm dark:border-slate-700 dark:bg-slate-900"
+        className="ui-select w-full"
       >
         <option value="">Choose a reason…</option>
         {reasons.data?.items.map((reason) => (
@@ -79,7 +81,7 @@ export function WonConfirmModal({
 }) {
   return (
     <ModalShell title="Confirm sale" onClose={onClose}>
-      <p className="text-sm text-slate-600 dark:text-slate-300">
+      <p className="text-[13px] text-slate-600 dark:text-slate-300">
         Move the deal to “Leased”? The deal will be closed as won.
       </p>
       <div className="mt-4 flex justify-end gap-2">
@@ -115,7 +117,7 @@ export function NoteModal({ deal, onClose }: { deal: Deal; onClose: () => void }
         value={body}
         onChange={(event) => setBody(event.target.value)}
         rows={4}
-        className="w-full rounded-md border border-slate-200 bg-white p-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+        className="w-full rounded-md border border-slate-200/90 bg-white p-2.5 text-[13px] shadow-subtle focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-800 dark:bg-[#121418]"
       />
       <div className="mt-4 flex justify-end gap-2">
         <Button variant="ghost" onClick={onClose}>
@@ -167,7 +169,7 @@ export function CreateDealModal({
 
   return (
     <ModalShell title="Quick deal" onClose={onClose}>
-      <label className="block text-sm font-medium">
+      <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
         Contact (search from 2 letters)
         <Input
           className="mt-1"
@@ -180,12 +182,12 @@ export function CreateDealModal({
         />
       </label>
       {search.data && search.data.items.length > 0 && !contactId && (
-        <ul className="mt-1 max-h-32 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700">
+        <ul className="mt-1 max-h-32 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-subtle dark:border-slate-800 dark:bg-[#121418]">
           {search.data.items.map((contact) => (
             <li key={contact.id}>
               <button
                 type="button"
-                className="w-full px-2 py-1 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="w-full px-2.5 py-1.5 text-left text-xs hover:bg-slate-50 dark:hover:bg-slate-800"
                 onClick={() => {
                   setContactId(contact.id);
                   setTerm(contact.name ?? contact.phone ?? contact.id);
@@ -197,11 +199,11 @@ export function CreateDealModal({
           ))}
         </ul>
       )}
-      <label className="mt-3 block text-sm font-medium">
+      <label className="mt-3 block text-xs font-medium text-slate-700 dark:text-slate-300">
         Title
         <Input className="mt-1" value={title} onChange={(event) => setTitle(event.target.value)} />
       </label>
-      <label className="mt-3 block text-sm font-medium">
+      <label className="mt-3 block text-xs font-medium text-slate-700 dark:text-slate-300">
         Amount, USD
         <Input
           className="mt-1"

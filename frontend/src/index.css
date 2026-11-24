@@ -1,3 +1,98 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-canvas: 220 20% 97.5%;
+    --surface: 0 0% 100%;
+    --surface-muted: 220 16% 96%;
+    --surface-elevated: 0 0% 100%;
+    --surface-hover: 220 14% 95%;
+    --border-hairline: 220 13% 91%;
+    --border-strong: 220 13% 84%;
+    --text-primary: 224 30% 10%;
+    --text-secondary: 220 11% 42%;
+    --text-muted: 220 9% 58%;
+    --accent: 243 75% 59%;
+    color-scheme: light;
+  }
+
+  .dark {
+    --bg-canvas: 225 22% 5.5%;
+    --surface: 225 18% 8.5%;
+    --surface-muted: 225 16% 11.5%;
+    --surface-elevated: 225 17% 10.5%;
+    --surface-hover: 225 15% 13.5%;
+    --border-hairline: 225 14% 16%;
+    --border-strong: 225 14% 22%;
+    --text-primary: 220 20% 96%;
+    --text-secondary: 220 11% 65%;
+    --text-muted: 220 9% 46%;
+    --accent: 243 85% 67%;
+    color-scheme: dark;
+  }
+
+  html {
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-[#F8F9FB] text-slate-900 dark:bg-[#0B0C0E] dark:text-slate-100 font-sans;
+  }
+
+  /* Custom refined scrollbars (Linear / Attio style) */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-slate-300/70 dark:bg-slate-700/70;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-400 dark:bg-slate-600;
+  }
+}
+
+@layer components {
+  .ui-select {
+    @apply h-10 md:h-8 rounded-md border border-slate-200/90 bg-white px-2.5 text-sm font-normal text-slate-800 shadow-subtle transition-all hover:border-slate-300 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-[#121418] dark:text-slate-100 dark:hover:border-slate-700 dark:focus:border-brand-400;
+  }
+
+  .ui-card {
+    @apply rounded-lg border border-slate-200/80 bg-white shadow-card dark:border-slate-800/90 dark:bg-[#121418];
+  }
+
+  .ui-badge {
+    @apply inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium leading-4 ring-1 ring-inset;
+  }
+
+  .ui-table-wrapper {
+    @apply overflow-x-auto rounded-lg border border-slate-200/80 bg-white shadow-card dark:border-slate-800/90 dark:bg-[#121418];
+  }
+
+  .ui-table {
+    @apply w-full text-left text-[13px];
+  }
+
+  .ui-table thead {
+    @apply border-b border-slate-200/80 bg-slate-50/70 text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:border-slate-800/80 dark:bg-[#16181D] dark:text-slate-400;
+  }
+
+  .ui-table th {
+    @apply px-3.5 py-2.5 font-medium;
+  }
+
+  .ui-table td {
+    @apply px-3.5 py-2.5 align-middle text-slate-700 dark:text-slate-200;
+  }
+
+  .ui-table tbody tr {
+    @apply border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/80 dark:border-slate-800/60 dark:hover:bg-[#181B22];
+  }
+}

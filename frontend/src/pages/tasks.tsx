@@ -97,29 +97,30 @@ function TaskModal({ task, onClose }: { task?: Task; onClose: () => void }) {
       role="dialog"
       aria-modal="true"
       aria-label={task ? "Edit task" : "New task"}
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
       onClick={onClose}
     >
       <form
         onSubmit={form.handleSubmit((values) => void save(values))}
         onClick={(event) => event.stopPropagation()}
-        className="w-full max-w-md rounded-lg bg-white p-5 dark:bg-slate-900"
+        className="w-full max-w-md rounded-xl border border-slate-200/90 bg-white p-5 shadow-modal dark:border-slate-800 dark:bg-[#14171E]"
       >
-        <h2 className="text-lg font-bold">{task ? "Edit task" : "New task"}</h2>
-        <label className="mt-3 block text-sm font-medium">
+        <h2 className="text-base font-semibold tracking-[-0.015em] text-slate-900 dark:text-slate-100">
+          {task ? "Edit task" : "New task"}
+        </h2>
+        <label className="mt-3.5 block text-xs font-medium text-slate-700 dark:text-slate-300">
           Title
           <Input className="mt-1" {...form.register("title")} />
           {form.formState.errors.title && (
-            <span className="text-xs text-red-600">{form.formState.errors.title.message}</span>
+            <span className="mt-0.5 block text-xs text-red-600">
+              {form.formState.errors.title.message}
+            </span>
           )}
         </label>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <label className="block text-sm font-medium">
+        <div className="mt-3 grid grid-cols-2 gap-2.5">
+          <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
             Type
-            <select
-              {...form.register("type")}
-              className="mt-1 h-11 md:h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-base md:text-sm dark:border-slate-700 dark:bg-slate-900"
-            >
+            <select {...form.register("type")} className="ui-select mt-1 w-full">
               {Object.entries(TYPE_LABEL).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
@@ -127,17 +128,14 @@ function TaskModal({ task, onClose }: { task?: Task; onClose: () => void }) {
               ))}
             </select>
           </label>
-          <label className="block text-sm font-medium">
+          <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
             Due
             <Input className="mt-1" type="datetime-local" {...form.register("due_at")} />
           </label>
         </div>
-        <label className="mt-3 block text-sm font-medium">
+        <label className="mt-3 block text-xs font-medium text-slate-700 dark:text-slate-300">
           Assignee
-          <select
-            {...form.register("assignee_id")}
-            className="mt-1 h-11 md:h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-base md:text-sm dark:border-slate-700 dark:bg-slate-900"
-          >
+          <select {...form.register("assignee_id")} className="ui-select mt-1 w-full">
             <option value="">Unassigned</option>
             {users.data?.items.map((user) => (
               <option key={user.id} value={user.id}>
@@ -171,10 +169,10 @@ function TaskRow({ task, onEdit }: { task: Task; onEdit: (task: Task) => void })
     <div
       data-task-row={task.id}
       className={cn(
-        "flex items-center gap-2 rounded-lg border p-2 text-sm",
+        "flex items-center gap-2.5 rounded-lg border px-3 py-2 text-xs shadow-subtle transition-colors",
         overdue
-          ? "border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950/40"
-          : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900",
+          ? "border-red-300/80 bg-red-50/70 dark:border-red-900/70 dark:bg-red-950/30"
+          : "border-slate-200/80 bg-white hover:border-slate-300 dark:border-slate-800/90 dark:bg-[#121418] dark:hover:border-slate-700",
       )}
     >
       <input
@@ -187,19 +185,31 @@ function TaskRow({ task, onEdit }: { task: Task; onEdit: (task: Task) => void })
             { onError: (error) => toastError(push, error) },
           )
         }
+        className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
       />
       <div className="min-w-0 flex-1">
-        <p className={cn("truncate font-medium", done && "line-through")}>{task.title}</p>
-        <p className="text-xs text-slate-500">
+        <p
+          className={cn(
+            "truncate text-[13px] font-medium text-slate-900 dark:text-slate-100",
+            done && "text-slate-400 line-through dark:text-slate-500",
+          )}
+        >
+          {task.title}
+        </p>
+        <p className="mt-0.5 text-[11px] text-slate-500">
           {TYPE_LABEL[task.type] ?? task.type}
           {task.due_at ? ` · due ${formatDate(task.due_at)}` : ""}
-          {overdue ? " · overdue" : ""}
+          {overdue ? (
+            <span className="font-semibold text-red-600 dark:text-red-400"> · overdue</span>
+          ) : (
+            ""
+          )}
         </p>
       </div>
       {task.deal_id && (
         <button
           type="button"
-          className="shrink-0 text-xs text-slate-500 underline"
+          className="shrink-0 text-xs font-medium text-brand-600 hover:underline dark:text-brand-400"
           onClick={() => navigate(`/deals/${task.deal_id}`)}
         >
           Deal
@@ -207,7 +217,7 @@ function TaskRow({ task, onEdit }: { task: Task; onEdit: (task: Task) => void })
       )}
       <button
         type="button"
-        className="shrink-0 text-xs text-slate-500 underline"
+        className="shrink-0 text-xs text-slate-500 hover:text-slate-900 hover:underline dark:hover:text-slate-200"
         onClick={() => onEdit(task)}
       >
         Edit
@@ -216,7 +226,7 @@ function TaskRow({ task, onEdit }: { task: Task; onEdit: (task: Task) => void })
         type="button"
         aria-label={`Delete ${task.title}`}
         disabled={remove.isPending}
-        className="shrink-0 text-xs text-slate-400 hover:text-red-600 disabled:opacity-50"
+        className="shrink-0 rounded px-1 text-xs text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950/40"
         onClick={() => remove.mutate(task.id, { onError: (error) => toastError(push, error) })}
       >
         ×
@@ -258,33 +268,42 @@ export function TasksPage() {
   });
 
   const group = (title: string, tasks: Task[]) => (
-    <section aria-label={title} role="region">
-      <h2 className="mb-1 text-sm font-bold uppercase tracking-wide text-slate-500">
-        {title} ({tasks.length})
-      </h2>
+    <section
+      aria-label={title}
+      role="region"
+      className="flex flex-col rounded-lg border border-slate-200/75 bg-slate-100/50 p-3 dark:border-slate-800/80 dark:bg-[#111318]"
+    >
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          {title} ({tasks.length})
+        </h2>
+      </div>
       <div className="flex flex-col gap-1.5">
         {tasks.map((task) => (
           <TaskRow key={task.id} task={task} onEdit={setEditing} />
         ))}
-        {tasks.length === 0 && <p className="text-xs text-slate-400">Empty.</p>}
+        {tasks.length === 0 && <p className="py-2 text-xs text-slate-400">Empty.</p>}
       </div>
     </section>
   );
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex rounded-md border border-slate-200 dark:border-slate-700">
+    <div className="flex flex-col gap-3.5">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <h1 className="text-base font-semibold tracking-[-0.015em] text-slate-900 dark:text-slate-100">
+          Tasks
+        </h1>
+        <div className="inline-flex rounded-md border border-slate-200/90 bg-slate-100/80 p-0.5 dark:border-slate-800 dark:bg-[#14171D]">
           {(["groups", "week"] as const).map((mode) => (
             <button
               key={mode}
               type="button"
               onClick={() => setView(mode)}
               className={cn(
-                "px-3 py-1.5 text-sm",
+                "rounded-[5px] px-2.5 py-1 text-xs font-medium transition-all",
                 view === mode
-                  ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-                  : "text-slate-600 dark:text-slate-300",
+                  ? "bg-white text-slate-900 shadow-subtle dark:bg-[#1E222B] dark:text-white"
+                  : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200",
               )}
             >
               {mode === "groups" ? "Lists" : "Week"}
@@ -297,7 +316,7 @@ export function TasksPage() {
       </div>
 
       {view === "groups" ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3.5 md:grid-cols-2 xl:grid-cols-3">
           {group("Overdue", overdue)}
           {group("Today", dueToday)}
           {group("Tomorrow", dueTomorrow)}
@@ -305,15 +324,13 @@ export function TasksPage() {
           {group("Done", done)}
         </div>
       ) : (
-        <div className="grid gap-2 md:grid-cols-7">
+        <div className="grid gap-2.5 md:grid-cols-7">
           {weekDays.map((day) => (
-            <section
-              key={day.key}
-              aria-label={day.label}
-              className="rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900"
-            >
-              <h2 className="mb-1 text-xs font-bold">{day.label}</h2>
-              <div className="flex flex-col gap-1">
+            <section key={day.key} aria-label={day.label} className="ui-card p-2.5">
+              <h2 className="mb-2 border-b border-slate-100 pb-1.5 text-xs font-semibold text-slate-800 dark:border-slate-800 dark:text-slate-200">
+                {day.label}
+              </h2>
+              <div className="flex flex-col gap-1.5">
                 {day.tasks.map((task) => (
                   <TaskRow key={task.id} task={task} onEdit={setEditing} />
                 ))}

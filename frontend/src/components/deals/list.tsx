@@ -118,28 +118,29 @@ export function DealsListView({ filters, stagesById, contactsById, onOpen }: Lis
     const contact = contactsById.get(deal.contact_id);
     switch (column) {
       case "title":
-        return <span className="font-medium">{deal.title}</span>;
+        return <span className="font-medium text-slate-900 dark:text-slate-100">{deal.title}</span>;
       case "contact":
         return contact?.name ?? contact?.phone ?? "—";
       case "amount":
-        return formatMoney(deal.amount, deal.currency);
+        return <span className="font-mono text-xs">{formatMoney(deal.amount, deal.currency)}</span>;
       case "owner":
         return users.data?.items.find((user) => user.id === deal.owner_id)?.name ?? "—";
       case "tags":
         return deal.tags.map((tag) => tag.name).join(", ") || "—";
       case "updated":
-        return formatRelative(deal.updated_at);
+        return <span className="text-xs text-slate-500">{formatRelative(deal.updated_at)}</span>;
     }
   };
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-3 text-xs">
-        <span className="font-medium">Columns:</span>
+      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 dark:text-slate-400">
+        <span className="font-semibold uppercase tracking-wider text-slate-400">Columns:</span>
         {ALL_COLUMNS.map((col) => (
-          <label key={col.id} className="flex items-center gap-1">
+          <label key={col.id} className="inline-flex cursor-pointer items-center gap-1.5">
             <input
               type="checkbox"
+              className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
               checked={columns.includes(col.id)}
               onChange={() => toggleColumn(col.id)}
             />
@@ -149,13 +150,15 @@ export function DealsListView({ filters, stagesById, contactsById, onOpen }: Lis
       </div>
 
       {selected.size > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 text-sm dark:border-slate-700 dark:bg-slate-900">
-          <span className="font-medium">Selected: {selected.size}</span>
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-brand-200 bg-brand-50/50 p-2.5 text-xs dark:border-brand-900/50 dark:bg-brand-950/20">
+          <span className="font-semibold text-brand-800 dark:text-brand-200">
+            Selected: {selected.size}
+          </span>
           <select
             aria-label="Bulk: stage"
             value={bulkStage}
             onChange={(event) => setBulkStage(event.target.value)}
-            className="h-11 md:h-8 rounded-md border border-slate-200 bg-white px-1 dark:border-slate-700 dark:bg-slate-900"
+            className="ui-select"
           >
             <option value="">Stage…</option>
             {[...stagesById.values()].map((stage) => (
@@ -168,7 +171,7 @@ export function DealsListView({ filters, stagesById, contactsById, onOpen }: Lis
             aria-label="Bulk: owner"
             value={bulkOwner}
             onChange={(event) => setBulkOwner(event.target.value)}
-            className="h-11 md:h-8 rounded-md border border-slate-200 bg-white px-1 dark:border-slate-700 dark:bg-slate-900"
+            className="ui-select"
           >
             <option value="">Owner…</option>
             {users.data?.items.map((user) => (
@@ -181,7 +184,7 @@ export function DealsListView({ filters, stagesById, contactsById, onOpen }: Lis
             aria-label="Bulk: tag"
             value={bulkTag}
             onChange={(event) => setBulkTag(event.target.value)}
-            className="h-11 md:h-8 rounded-md border border-slate-200 bg-white px-1 dark:border-slate-700 dark:bg-slate-900"
+            className="ui-select"
           >
             <option value="">Tag…</option>
             {tags.data?.items.map((tag) => (
@@ -194,7 +197,7 @@ export function DealsListView({ filters, stagesById, contactsById, onOpen }: Lis
             aria-label="Bulk: close as lost"
             value={bulkReason}
             onChange={(event) => setBulkReason(event.target.value)}
-            className="h-11 md:h-8 rounded-md border border-slate-200 bg-white px-1 dark:border-slate-700 dark:bg-slate-900"
+            className="ui-select"
           >
             <option value="">Close as lost…</option>
             {reasons.data?.items.map((reason) => (
@@ -209,11 +212,11 @@ export function DealsListView({ filters, stagesById, contactsById, onOpen }: Lis
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-        <table className="w-full min-w-160 text-left text-sm">
+      <div className="ui-table-wrapper">
+        <table className="ui-table min-w-160">
           <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-800">
-              <th className="w-8 p-2">
+            <tr>
+              <th className="w-8">
                 <input
                   type="checkbox"
                   aria-label="Select all"
@@ -231,12 +234,12 @@ export function DealsListView({ filters, stagesById, contactsById, onOpen }: Lis
                 const label = ALL_COLUMNS.find((candidate) => candidate.id === col)?.label;
                 const sortField = dealSortField(col);
                 return (
-                  <th key={col} className="p-2">
+                  <th key={col}>
                     {sortField ? (
                       <button
                         type="button"
                         onClick={() => toggleSort(sortField)}
-                        className={cn("font-medium hover:underline")}
+                        className={cn("font-medium hover:text-slate-900 dark:hover:text-white")}
                       >
                         {label}
                         {sort.replace("-", "") === sortField &&
@@ -248,43 +251,56 @@ export function DealsListView({ filters, stagesById, contactsById, onOpen }: Lis
                   </th>
                 );
               })}
-              <th className="p-2 font-medium">Stage</th>
+              <th>Stage</th>
             </tr>
           </thead>
           <tbody>
-            {items.map((deal) => (
-              <tr
-                key={deal.id}
-                data-deal-id={deal.id}
-                onClick={() => onOpen(deal.id)}
-                className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-              >
-                <td className="p-2" onClick={(event) => event.stopPropagation()}>
-                  <input
-                    type="checkbox"
-                    aria-label={`Select ${deal.title}`}
-                    checked={selected.has(deal.id)}
-                    onChange={() => toggleSelect(deal.id)}
-                  />
-                </td>
-                {columns.map((col) => (
-                  <td key={col} className="max-w-60 truncate p-2">
-                    {cell(deal, col)}
+            {items.map((deal) => {
+              const stage = stagesById.get(deal.stage_id);
+              return (
+                <tr
+                  key={deal.id}
+                  data-deal-id={deal.id}
+                  onClick={() => onOpen(deal.id)}
+                  className="cursor-pointer"
+                >
+                  <td onClick={(event) => event.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${deal.title}`}
+                      checked={selected.has(deal.id)}
+                      onChange={() => toggleSelect(deal.id)}
+                    />
                   </td>
-                ))}
-                <td className="p-2">{stagesById.get(deal.stage_id)?.name ?? "—"}</td>
-              </tr>
-            ))}
+                  {columns.map((col) => (
+                    <td key={col} className="max-w-60 truncate">
+                      {cell(deal, col)}
+                    </td>
+                  ))}
+                  <td>
+                    <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200/80 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700 dark:border-slate-700/80 dark:bg-slate-800/70 dark:text-slate-300">
+                      {stage && (
+                        <span
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{ backgroundColor: stage.color }}
+                        />
+                      )}
+                      {stage?.name ?? "—"}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
-        {list.isPending && <p className="p-4 text-sm text-slate-500">Loading…</p>}
-        {list.isError && <p className="p-4 text-sm text-red-600">Could not load deals.</p>}
+        {list.isPending && <p className="p-4 text-xs text-slate-500">Loading…</p>}
+        {list.isError && <p className="p-4 text-xs text-red-600">Could not load deals.</p>}
         {!list.isPending && items.length === 0 && (
-          <p className="p-4 text-sm text-slate-500">No deals. Adjust the filters.</p>
+          <p className="p-4 text-xs text-slate-500">No deals. Adjust the filters.</p>
         )}
       </div>
 
-      <div className="flex items-center gap-2 text-sm">
+      <div className="flex items-center gap-2 text-xs text-slate-500">
         <Button
           variant="secondary"
           size="sm"
@@ -293,7 +309,7 @@ export function DealsListView({ filters, stagesById, contactsById, onOpen }: Lis
         >
           Back
         </Button>
-        <span>
+        <span className="font-mono">
           {offset + 1}–{Math.min(offset + limit, total)} of {total}
         </span>
         <Button

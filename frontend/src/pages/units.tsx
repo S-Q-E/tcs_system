@@ -55,9 +55,12 @@ function autoUnitMapping(header: string[]): Record<string, string> {
 }
 
 const STATUS_BADGE: Record<UnitStatus, string> = {
-  available: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
-  leased: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  hidden: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200",
+  available:
+    "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-500/20 dark:bg-emerald-950/50 dark:text-emerald-300",
+  leased:
+    "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-500/20 dark:bg-slate-800 dark:text-slate-300",
+  hidden:
+    "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-500/20 dark:bg-amber-950/50 dark:text-amber-300",
 };
 
 export function UnitsPage() {
@@ -72,18 +75,20 @@ export function UnitsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-xl font-bold">Units</h1>
-        <nav className="flex flex-wrap gap-1 text-sm md:ml-4">
+    <div className="flex flex-col gap-3.5">
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-base font-semibold tracking-[-0.015em] text-slate-900 dark:text-slate-100">
+          Units
+        </h1>
+        <nav className="inline-flex rounded-md border border-slate-200/90 bg-slate-100/80 p-0.5 dark:border-slate-800 dark:bg-[#14171D]">
           <button
             type="button"
             onClick={() => setTab("list")}
             className={cn(
-              "rounded-md px-2.5 py-1",
+              "rounded-[5px] px-2.5 py-1 text-xs font-medium transition-all",
               tab === "list"
-                ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-                : "hover:bg-slate-100 dark:hover:bg-slate-800",
+                ? "bg-white text-slate-900 shadow-subtle dark:bg-[#1E222B] dark:text-white"
+                : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200",
             )}
           >
             List
@@ -93,10 +98,10 @@ export function UnitsPage() {
               type="button"
               onClick={() => setTab("import")}
               className={cn(
-                "rounded-md px-2.5 py-1",
+                "rounded-[5px] px-2.5 py-1 text-xs font-medium transition-all",
                 tab === "import"
-                  ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-                  : "hover:bg-slate-100 dark:hover:bg-slate-800",
+                  ? "bg-white text-slate-900 shadow-subtle dark:bg-[#1E222B] dark:text-white"
+                  : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200",
               )}
             >
               Import CSV
@@ -154,7 +159,7 @@ function UnitsListView({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200/80 bg-white/80 p-2 shadow-subtle dark:border-slate-800/80 dark:bg-[#121418]/80">
         <Input
           value={search}
           onChange={(e) => {
@@ -171,7 +176,7 @@ function UnitsListView({ isAdmin }: { isAdmin: boolean }) {
             setStatusFilter(e.target.value);
             setOffset(0);
           }}
-          className="h-11 md:h-9 rounded-md border border-slate-200 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+          className="ui-select"
         >
           <option value="">All statuses</option>
           <option value="available">Available</option>
@@ -185,7 +190,7 @@ function UnitsListView({ isAdmin }: { isAdmin: boolean }) {
             setBedsFilter(e.target.value);
             setOffset(0);
           }}
-          className="h-11 md:h-9 rounded-md border border-slate-200 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+          className="ui-select"
         >
           <option value="">Any beds</option>
           <option value="0">Studio</option>
@@ -212,50 +217,50 @@ function UnitsListView({ isAdmin }: { isAdmin: boolean }) {
         )}
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 text-xs uppercase text-slate-500 dark:border-slate-800">
+      <div className="ui-table-wrapper">
+        <table className="ui-table">
+          <thead>
             <tr>
-              <th className="p-2.5">Building</th>
-              <th className="p-2.5">Unit</th>
-              <th className="p-2.5">Beds / Baths</th>
-              <th className="p-2.5">Rent</th>
-              <th className="p-2.5">Deposit</th>
-              <th className="p-2.5">Available</th>
-              <th className="p-2.5">Pets</th>
-              <th className="p-2.5">Status</th>
-              {isAdmin && <th className="p-2.5">Actions</th>}
+              <th>Building</th>
+              <th>Unit</th>
+              <th>Beds / Baths</th>
+              <th>Rent</th>
+              <th>Deposit</th>
+              <th>Available</th>
+              <th>Pets</th>
+              <th>Status</th>
+              {isAdmin && <th>Actions</th>}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          <tbody>
             {items.map((u) => (
-              <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                <td className="p-2.5 font-medium">{u.building}</td>
-                <td className="p-2.5">{u.unit_number}</td>
-                <td className="p-2.5">
+              <tr key={u.id}>
+                <td className="font-medium text-slate-900 dark:text-slate-100">{u.building}</td>
+                <td className="font-mono text-xs">{u.unit_number}</td>
+                <td className="font-mono text-xs">
                   {u.beds}BR / {u.baths}BA
                 </td>
-                <td className="p-2.5">${u.rent_usd.toLocaleString()}</td>
-                <td className="p-2.5">
+                <td className="font-mono text-xs font-semibold">${u.rent_usd.toLocaleString()}</td>
+                <td className="font-mono text-xs">
                   {u.deposit_usd != null ? `$${u.deposit_usd.toLocaleString()}` : "—"}
                 </td>
-                <td className="p-2.5">{u.available_from ?? "—"}</td>
-                <td className="max-w-44 p-2.5 text-xs text-slate-600 dark:text-slate-300">
+                <td className="font-mono text-xs">{u.available_from ?? "—"}</td>
+                <td className="max-w-44 text-xs text-slate-600 dark:text-slate-300">
                   <div className="truncate">{u.pets_policy ?? "—"}</div>
                   <div className="mt-0.5 flex gap-1">
                     {u.allows_dogs && (
-                      <span className="rounded bg-emerald-50 px-1 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                      <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-500/20 dark:bg-emerald-950/60 dark:text-emerald-300">
                         dogs
                       </span>
                     )}
                     {u.allows_cats && (
-                      <span className="rounded bg-emerald-50 px-1 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                      <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-500/20 dark:bg-emerald-950/60 dark:text-emerald-300">
                         cats
                       </span>
                     )}
                   </div>
                 </td>
-                <td className="p-2.5">
+                <td>
                   {isAdmin ? (
                     <select
                       aria-label={`Status for ${u.building} ${u.unit_number}`}
@@ -263,7 +268,7 @@ function UnitsListView({ isAdmin }: { isAdmin: boolean }) {
                       disabled={updateUnit.isPending}
                       onChange={(e) => void quickStatus(u, e.target.value as UnitStatus)}
                       className={cn(
-                        "rounded-full px-2 py-0.5 text-xs font-medium",
+                        "rounded-md px-2 py-0.5 text-xs font-medium",
                         STATUS_BADGE[u.status],
                       )}
                     >
@@ -274,7 +279,7 @@ function UnitsListView({ isAdmin }: { isAdmin: boolean }) {
                   ) : (
                     <span
                       className={cn(
-                        "inline-block rounded-full px-2 py-0.5 text-xs font-medium",
+                        "inline-block rounded-md px-2 py-0.5 text-xs font-medium",
                         STATUS_BADGE[u.status],
                       )}
                     >
@@ -283,18 +288,18 @@ function UnitsListView({ isAdmin }: { isAdmin: boolean }) {
                   )}
                 </td>
                 {isAdmin && (
-                  <td className="p-2.5">
-                    <div className="flex gap-2 text-xs">
+                  <td>
+                    <div className="flex gap-2.5 text-xs">
                       <button
                         type="button"
-                        className="text-blue-600 hover:underline"
+                        className="font-medium text-brand-600 hover:underline dark:text-brand-400"
                         onClick={() => setEditing(u)}
                       >
                         Edit
                       </button>
                       <button
                         type="button"
-                        className="text-red-600 hover:underline"
+                        className="font-medium text-red-600 hover:underline dark:text-red-400"
                         onClick={() => void remove(u)}
                       >
                         Delete
@@ -306,15 +311,15 @@ function UnitsListView({ isAdmin }: { isAdmin: boolean }) {
             ))}
           </tbody>
         </table>
-        {list.isPending && <p className="p-4 text-sm text-slate-500">Loading units…</p>}
-        {list.isError && <p className="p-4 text-sm text-red-600">Could not load units.</p>}
+        {list.isPending && <p className="p-4 text-xs text-slate-500">Loading units…</p>}
+        {list.isError && <p className="p-4 text-xs text-red-600">Could not load units.</p>}
         {!list.isPending && items.length === 0 && (
-          <p className="p-4 text-sm text-slate-500">No units found.</p>
+          <p className="p-4 text-xs text-slate-500">No units found.</p>
         )}
       </div>
 
       {total > limit && (
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-2 text-xs text-slate-500">
           <Button
             variant="secondary"
             size="sm"
@@ -323,7 +328,7 @@ function UnitsListView({ isAdmin }: { isAdmin: boolean }) {
           >
             Back
           </Button>
-          <span>
+          <span className="font-mono">
             {offset + 1}–{Math.min(offset + limit, total)} of {total}
           </span>
           <Button
@@ -353,7 +358,9 @@ function UnitFormModal({ unit, onClose }: { unit: Unit | null; onClose: () => vo
   const [beds, setBeds] = useState(String(unit?.beds ?? 1));
   const [baths, setBaths] = useState(String(unit?.baths ?? 1));
   const [rentUsd, setRentUsd] = useState(String(unit?.rent_usd ?? 1800));
-  const [depositUsd, setDepositUsd] = useState(unit?.deposit_usd != null ? String(unit.deposit_usd) : "");
+  const [depositUsd, setDepositUsd] = useState(
+    unit?.deposit_usd != null ? String(unit.deposit_usd) : "",
+  );
   const [availableFrom, setAvailableFrom] = useState(unit?.available_from ?? "");
   const [petsPolicy, setPetsPolicy] = useState(unit?.pets_policy ?? "");
   const [allowsDogs, setAllowsDogs] = useState(unit?.allows_dogs ?? false);
@@ -395,13 +402,17 @@ function UnitFormModal({ unit, onClose }: { unit: Unit | null; onClose: () => vo
 
   return (
     <ModalShell title={unit ? "Edit unit" : "New unit"} onClose={onClose}>
-      <div className="flex flex-col gap-2.5 text-sm">
+      <div className="flex flex-col gap-2.5 text-xs">
         <div className="grid grid-cols-2 gap-2">
-          <label className="block">
+          <label className="block font-medium text-slate-700 dark:text-slate-300">
             Building *
-            <Input className="mt-1" value={building} onChange={(e) => setBuilding(e.target.value)} />
+            <Input
+              className="mt-1"
+              value={building}
+              onChange={(e) => setBuilding(e.target.value)}
+            />
           </label>
-          <label className="block">
+          <label className="block font-medium text-slate-700 dark:text-slate-300">
             Unit number *
             <Input
               className="mt-1"
@@ -411,7 +422,7 @@ function UnitFormModal({ unit, onClose }: { unit: Unit | null; onClose: () => vo
           </label>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <label className="block">
+          <label className="block font-medium text-slate-700 dark:text-slate-300">
             Beds
             <Input
               className="mt-1"
@@ -421,7 +432,7 @@ function UnitFormModal({ unit, onClose }: { unit: Unit | null; onClose: () => vo
               onChange={(e) => setBeds(e.target.value)}
             />
           </label>
-          <label className="block">
+          <label className="block font-medium text-slate-700 dark:text-slate-300">
             Baths
             <Input
               className="mt-1"
@@ -434,7 +445,7 @@ function UnitFormModal({ unit, onClose }: { unit: Unit | null; onClose: () => vo
           </label>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <label className="block">
+          <label className="block font-medium text-slate-700 dark:text-slate-300">
             Rent (USD)
             <Input
               className="mt-1"
@@ -444,7 +455,7 @@ function UnitFormModal({ unit, onClose }: { unit: Unit | null; onClose: () => vo
               onChange={(e) => setRentUsd(e.target.value)}
             />
           </label>
-          <label className="block">
+          <label className="block font-medium text-slate-700 dark:text-slate-300">
             Deposit (USD)
             <Input
               className="mt-1"
@@ -456,7 +467,7 @@ function UnitFormModal({ unit, onClose }: { unit: Unit | null; onClose: () => vo
           </label>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <label className="block">
+          <label className="block font-medium text-slate-700 dark:text-slate-300">
             Available from
             <Input
               className="mt-1"
@@ -465,12 +476,12 @@ function UnitFormModal({ unit, onClose }: { unit: Unit | null; onClose: () => vo
               onChange={(e) => setAvailableFrom(e.target.value)}
             />
           </label>
-          <label className="block">
+          <label className="block font-medium text-slate-700 dark:text-slate-300">
             Status
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as UnitStatus)}
-              className="mt-1 h-11 md:h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="ui-select mt-1 w-full"
             >
               <option value="available">available</option>
               <option value="leased">leased</option>
@@ -478,7 +489,7 @@ function UnitFormModal({ unit, onClose }: { unit: Unit | null; onClose: () => vo
             </select>
           </label>
         </div>
-        <label className="block">
+        <label className="block font-medium text-slate-700 dark:text-slate-300">
           Pets policy
           <Input
             className="mt-1"
@@ -486,7 +497,7 @@ function UnitFormModal({ unit, onClose }: { unit: Unit | null; onClose: () => vo
             onChange={(e) => setPetsPolicy(e.target.value)}
           />
         </label>
-        <div className="flex gap-4 text-sm">
+        <div className="flex gap-4 text-xs">
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -504,13 +515,13 @@ function UnitFormModal({ unit, onClose }: { unit: Unit | null; onClose: () => vo
             Cats allowed
           </label>
         </div>
-        <label className="block">
+        <label className="block font-medium text-slate-700 dark:text-slate-300">
           Description
           <textarea
             rows={3}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="mt-1 w-full rounded-md border border-slate-200 bg-white p-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="mt-1 w-full rounded-md border border-slate-200/90 bg-white p-2 text-xs shadow-subtle dark:border-slate-800 dark:bg-[#121418]"
           />
         </label>
         <div className="mt-2 flex justify-end gap-2">
@@ -609,12 +620,15 @@ function UnitsImportView() {
   }, [finished, running, qc]);
 
   return (
-    <div className="flex max-w-2xl flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="font-medium">Import units from CSV</h2>
+    <div className="ui-card flex max-w-2xl flex-col gap-3 p-4">
+      <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+        Import units from CSV
+      </h2>
       <input
         aria-label="Units CSV file"
         type="file"
         accept=".csv,text/csv"
+        className="text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-brand-700 hover:file:bg-brand-100 dark:text-slate-300 dark:file:bg-brand-950/60 dark:file:text-brand-300"
         onChange={(e) => {
           const f = e.target.files?.[0] ?? null;
           setFile(f);
@@ -623,15 +637,17 @@ function UnitsImportView() {
         }}
       />
       {header.length > 0 && (
-        <div className="flex flex-col gap-1 text-sm">
-          <p className="font-medium">Column mapping:</p>
+        <div className="flex flex-col gap-1.5 text-xs">
+          <p className="font-medium text-slate-700 dark:text-slate-300">Column mapping:</p>
           {header.map((col) => (
             <label key={col} className="flex items-center gap-2">
-              <span className="w-40 truncate font-mono text-xs">{col}</span>
+              <span className="w-40 truncate font-mono text-xs text-slate-600 dark:text-slate-400">
+                {col}
+              </span>
               <select
                 value={mapping[col] ?? "ignore"}
                 onChange={(e) => setMapping((prev) => ({ ...prev, [col]: e.target.value }))}
-                className="h-9 rounded-md border border-slate-200 bg-white px-2 dark:border-slate-700 dark:bg-slate-900"
+                className="ui-select"
               >
                 {UNIT_IMPORT_FIELDS.map((f) => (
                   <option key={f} value={f}>
@@ -652,7 +668,7 @@ function UnitsImportView() {
         </Button>
       </div>
       {preview && (
-        <div className="text-sm">
+        <div className="rounded-md bg-slate-50 p-3 text-xs dark:bg-slate-800/50">
           <p>
             Rows: {preview.total} · Valid: {preview.valid} · Errors: {preview.invalid}
           </p>
@@ -668,7 +684,7 @@ function UnitsImportView() {
         </div>
       )}
       {job.data && (
-        <div className="rounded-md bg-slate-50 p-3 text-sm dark:bg-slate-800">
+        <div className="rounded-md bg-slate-50 p-3 text-xs dark:bg-slate-800/50">
           <p>
             Job status: <strong>{job.data.status}</strong> · Imported: {job.data.ok_count} ·
             Errors: {job.data.error_count}

@@ -27,9 +27,11 @@ import { localInputToIso } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
 const SLOT_BADGE: Record<SlotStatus, string> = {
-  open: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
-  booked: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200",
-  blocked: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  open: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-500/20 dark:bg-emerald-950/50 dark:text-emerald-300",
+  booked:
+    "bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-500/20 dark:bg-brand-950/50 dark:text-brand-300",
+  blocked:
+    "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-500/20 dark:bg-slate-800 dark:text-slate-300",
 };
 
 function startOfWeekUtc(weekOffset: number): Date {
@@ -37,7 +39,11 @@ function startOfWeekUtc(weekOffset: number): Date {
   const day = now.getUTCDay(); // 0=Sun..6=Sat
   const diffToMon = (day + 6) % 7;
   const mon = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - diffToMon + weekOffset * 7),
+    Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate() - diffToMon + weekOffset * 7,
+    ),
   );
   return mon;
 }
@@ -126,15 +132,17 @@ export function SchedulePage() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-xl font-bold">Schedule</h1>
-        <span className="text-xs text-slate-500">(times shown in America/New_York)</span>
-        <div className="flex items-center gap-1 md:ml-4">
+    <div className="flex flex-col gap-3.5">
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200/80 bg-white/80 p-2.5 shadow-subtle dark:border-slate-800/80 dark:bg-[#121418]/80">
+        <h1 className="text-base font-semibold tracking-[-0.015em] text-slate-900 dark:text-slate-100">
+          Schedule
+        </h1>
+        <span className="text-[11px] text-slate-400">(times shown in America/New_York)</span>
+        <div className="flex items-center gap-1 md:ml-3">
           <Button variant="secondary" size="sm" onClick={() => setWeekOffset((w) => w - 1)}>
             Prev week
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => setWeekOffset(0)}>
+          <Button variant="ghost" size="sm" className="font-mono" onClick={() => setWeekOffset(0)}>
             {rangeLabel}
           </Button>
           <Button variant="secondary" size="sm" onClick={() => setWeekOffset((w) => w + 1)}>
@@ -145,7 +153,7 @@ export function SchedulePage() {
           aria-label="Slot status filter"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+          className="ui-select"
         >
           <option value="">All slots</option>
           <option value="open">Open</option>
@@ -153,7 +161,7 @@ export function SchedulePage() {
           <option value="blocked">Blocked</option>
         </select>
         {isAdmin && (
-          <div className="ml-auto flex gap-2">
+          <div className="ml-auto flex gap-1.5">
             <Button
               variant="secondary"
               size="sm"
@@ -169,37 +177,34 @@ export function SchedulePage() {
         )}
       </div>
 
-      {slotsQuery.isPending && <p className="text-sm text-slate-500">Loading schedule…</p>}
-      {slotsQuery.isError && <p className="text-sm text-red-600">Could not load schedule.</p>}
+      {slotsQuery.isPending && <p className="text-xs text-slate-500">Loading schedule…</p>}
+      {slotsQuery.isError && <p className="text-xs text-red-600">Could not load schedule.</p>}
       {!slotsQuery.isPending && grouped.length === 0 && (
-        <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900">
+        <div className="ui-card p-6 text-xs text-slate-500">
           No viewing slots in this week.
           {isAdmin && " Click “Generate 14 days” or “+ Add slot” to create slots."}
         </div>
       )}
 
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3.5">
         {grouped.map(([dayKey, group]) => (
-          <section
-            key={dayKey}
-            className="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
-          >
-            <header className="border-b border-slate-200 px-3 py-2 text-sm font-semibold dark:border-slate-800">
+          <section key={dayKey} className="ui-card overflow-hidden">
+            <header className="border-b border-slate-200/80 bg-slate-50/70 px-3.5 py-2 text-xs font-semibold text-slate-800 dark:border-slate-800/80 dark:bg-[#16181D] dark:text-slate-100">
               {group.label}
             </header>
-            <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800/70">
               {group.slots.map((slot) => (
                 <li
                   key={slot.id}
-                  className="flex flex-wrap items-center gap-3 px-3 py-2.5 text-sm"
+                  className="flex flex-wrap items-center gap-3 px-3.5 py-2.5 text-xs transition-colors hover:bg-slate-50/70 dark:hover:bg-[#181B22]"
                 >
-                  <span className="w-24 font-mono text-xs font-medium">
+                  <span className="w-24 font-mono text-xs font-semibold text-slate-900 dark:text-slate-100">
                     {formatEtTime(slot.starts_at)}
                   </span>
-                  <span className="text-xs text-slate-500">{slot.duration_min}m</span>
+                  <span className="font-mono text-[11px] text-slate-400">{slot.duration_min}m</span>
                   <span
                     className={cn(
-                      "rounded-full px-2 py-0.5 text-xs font-medium",
+                      "rounded-md px-2 py-0.5 text-[11px] font-medium",
                       SLOT_BADGE[slot.status],
                     )}
                   >
@@ -212,21 +217,23 @@ export function SchedulePage() {
                   )}
                   {slot.booking && (
                     <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <span className="font-medium">
+                      <span className="font-semibold text-slate-900 dark:text-slate-100">
                         {slot.booking.client_name ?? slot.booking.whatsapp_id ?? "Client"}
                       </span>
                       {slot.booking.client_phone && (
-                        <span className="text-slate-500">{slot.booking.client_phone}</span>
+                        <span className="font-mono text-slate-500">
+                          {slot.booking.client_phone}
+                        </span>
                       )}
                       {slot.booking.unit_label && (
-                        <span className="rounded bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                        <span className="rounded border border-slate-200/80 bg-slate-50 px-1.5 py-0.5 text-[11px] dark:border-slate-800 dark:bg-slate-800">
                           {slot.booking.unit_label}
                         </span>
                       )}
                       {slot.booking.deal_id && (
                         <Link
                           to={`/deals/${slot.booking.deal_id}`}
-                          className="text-blue-600 hover:underline"
+                          className="font-medium text-brand-600 hover:underline dark:text-brand-400"
                         >
                           Open deal
                         </Link>
@@ -341,8 +348,8 @@ function AddSlotModal({ onClose }: { onClose: () => void }) {
 
   return (
     <ModalShell title="Add viewing slot" onClose={onClose}>
-      <div className="flex flex-col gap-3 text-sm">
-        <label className="block">
+      <div className="flex flex-col gap-3 text-xs">
+        <label className="block font-medium text-slate-700 dark:text-slate-300">
           Date & time *
           <Input
             className="mt-1"
@@ -351,7 +358,7 @@ function AddSlotModal({ onClose }: { onClose: () => void }) {
             onChange={(e) => setStartsLocal(e.target.value)}
           />
         </label>
-        <label className="block">
+        <label className="block font-medium text-slate-700 dark:text-slate-300">
           Duration (minutes)
           <Input
             className="mt-1"
@@ -362,12 +369,12 @@ function AddSlotModal({ onClose }: { onClose: () => void }) {
             onChange={(e) => setDurationMin(e.target.value)}
           />
         </label>
-        <label className="block">
+        <label className="block font-medium text-slate-700 dark:text-slate-300">
           Unit (optional)
           <select
             value={unitId}
             onChange={(e) => setUnitId(e.target.value)}
-            className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="ui-select mt-1 w-full"
           >
             <option value="">Any unit (general slot)</option>
             {units.data?.items.map((u) => (
@@ -417,14 +424,14 @@ function BookSlotModal({ slot, onClose }: { slot: ViewingSlot; onClose: () => vo
 
   return (
     <ModalShell title={`Book ${formatEtDateTime(slot.starts_at)}`} onClose={onClose}>
-      <div className="flex flex-col gap-2.5 text-sm">
-        <label className="block">
+      <div className="flex flex-col gap-2.5 text-xs">
+        <label className="block font-medium text-slate-700 dark:text-slate-300">
           Unit
           <select
             value={unitId}
             disabled={Boolean(slot.unit_id)}
             onChange={(e) => setUnitId(e.target.value)}
-            className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="ui-select mt-1 w-full"
           >
             <option value="">Not specified</option>
             {units.data?.items.map((u) => (
@@ -434,7 +441,7 @@ function BookSlotModal({ slot, onClose }: { slot: ViewingSlot; onClose: () => vo
             ))}
           </select>
         </label>
-        <label className="block">
+        <label className="block font-medium text-slate-700 dark:text-slate-300">
           Client name
           <Input
             className="mt-1"
@@ -442,7 +449,7 @@ function BookSlotModal({ slot, onClose }: { slot: ViewingSlot; onClose: () => vo
             onChange={(e) => setClientName(e.target.value)}
           />
         </label>
-        <label className="block">
+        <label className="block font-medium text-slate-700 dark:text-slate-300">
           Client phone
           <Input
             className="mt-1"
@@ -450,7 +457,7 @@ function BookSlotModal({ slot, onClose }: { slot: ViewingSlot; onClose: () => vo
             onChange={(e) => setClientPhone(e.target.value)}
           />
         </label>
-        <label className="block">
+        <label className="block font-medium text-slate-700 dark:text-slate-300">
           Notes
           <Input className="mt-1" value={notes} onChange={(e) => setNotes(e.target.value)} />
         </label>
@@ -494,17 +501,17 @@ export function RescheduleModal({
 
   return (
     <ModalShell title="Reschedule viewing" onClose={onClose}>
-      <div className="flex flex-col gap-3 text-sm">
+      <div className="flex flex-col gap-3 text-xs">
         {currentStartsAt && (
-          <p className="text-slate-500">Current: {formatEtDateTime(currentStartsAt)}</p>
+          <p className="font-mono text-slate-500">Current: {formatEtDateTime(currentStartsAt)}</p>
         )}
-        <label className="block">
+        <label className="block font-medium text-slate-700 dark:text-slate-300">
           New open slot
           <select
             aria-label="New open slot"
             value={newSlotId}
             onChange={(e) => setNewSlotId(e.target.value)}
-            className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="ui-select mt-1 w-full"
           >
             <option value="">Choose a slot…</option>
             {openSlots.data?.items.map((s) => (
@@ -553,9 +560,9 @@ export function CancelBookingModal({
 
   return (
     <ModalShell title="Cancel viewing" onClose={onClose}>
-      <div className="flex flex-col gap-3 text-sm">
-        {startsAt && <p className="text-slate-600">Viewing: {formatEtDateTime(startsAt)}</p>}
-        <label className="block">
+      <div className="flex flex-col gap-3 text-xs">
+        {startsAt && <p className="font-mono text-slate-600">Viewing: {formatEtDateTime(startsAt)}</p>}
+        <label className="block font-medium text-slate-700 dark:text-slate-300">
           Reason (optional)
           <Input
             className="mt-1"

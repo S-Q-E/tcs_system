@@ -34,8 +34,10 @@ const BOT_FIELDS: { key: string; label: string }[] = [
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="block text-sm">
-      <span className="mb-1 block font-medium text-slate-600 dark:text-slate-300">{label}</span>
+    <label className="block text-xs">
+      <span className="mb-1 block text-[11px] font-medium text-slate-500 dark:text-slate-400">
+        {label}
+      </span>
       {children}
     </label>
   );
@@ -64,7 +66,7 @@ function CustomValueInput({
       <select
         value={typeof value === "string" ? value : ""}
         onChange={(event) => onChange(event.target.value || null)}
-        className="h-11 md:h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-base md:text-sm dark:border-slate-700 dark:bg-slate-900"
+        className="ui-select w-full"
       >
         <option value="">—</option>
         {field.options.map((option) => (
@@ -78,7 +80,7 @@ function CustomValueInput({
   if (field.type === "multiselect" && Array.isArray(field.options)) {
     const selected = Array.isArray(value) ? value.map(String) : [];
     return (
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         {field.options.map((option) => {
           const text = String(option);
           const on = selected.includes(text);
@@ -91,8 +93,8 @@ function CustomValueInput({
               }
               className={
                 on
-                  ? "rounded-full bg-slate-900 px-2 py-0.5 text-xs text-white dark:bg-slate-100 dark:text-slate-900"
-                  : "rounded-full bg-slate-100 px-2 py-0.5 text-xs dark:bg-slate-800"
+                  ? "rounded-md bg-brand-600 px-2 py-0.5 text-xs font-medium text-white dark:bg-brand-500"
+                  : "rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-800/70 dark:text-slate-300"
               }
             >
               {text}
@@ -170,7 +172,7 @@ export function DealDetail({ dealId, onClose }: { dealId: string; onClose?: () =
   }
   if (dealQuery.isError || !deal) {
     return (
-      <p className="text-sm text-red-600">
+      <p className="text-xs text-red-600">
         Could not load the deal.{" "}
         <button type="button" className="underline" onClick={() => dealQuery.refetch()}>
           Retry
@@ -251,145 +253,156 @@ export function DealDetail({ dealId, onClose }: { dealId: string; onClose?: () =
   const dirty = draft !== null || customDraft !== null;
 
   return (
-    <div className="flex flex-col gap-4 lg:flex-row">
-      <div className="flex w-full flex-col gap-3 lg:max-w-sm">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold">{contact?.name ?? "Deal"}</h2>
-          {onClose && (
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              Close
-            </Button>
-          )}
-        </div>
-
-        <Field label="Title">
-          <Input
-            defaultValue={deal.title}
-            key={`title-${deal.updated_at}`}
-            onChange={(event) => edit("title", event.target.value)}
-          />
-        </Field>
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Amount, USD">
-            <Input
-              type="number"
-              min="0"
-              defaultValue={deal.amount ?? ""}
-              key={`amount-${deal.updated_at}`}
-              onChange={(event) =>
-                edit("amount", event.target.value === "" ? null : Number(event.target.value))
-              }
-            />
-          </Field>
-          <Field label="Viewing">
-            <Input
-              type="datetime-local"
-              defaultValue={isoToLocalInput(deal.trial_at)}
-              key={`trial-${deal.updated_at}`}
-              onChange={(event) => edit("trial_at", localInputToIso(event.target.value))}
-            />
-          </Field>
-        </div>
-        <Field label="Owner">
-          <select
-            value={(draft?.owner_id as string) ?? deal.owner_id ?? ""}
-            onChange={(event) => edit("owner_id", event.target.value || null)}
-            className="h-11 md:h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-base md:text-sm dark:border-slate-700 dark:bg-slate-900"
-          >
-            <option value="">Unassigned</option>
-            {users.data?.items.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Stage">
-          <StageSelect deal={deal} onChange={changeStage} />
-        </Field>
-
-        <DealViewingPanel deal={deal} contact={contact} />
-
-        <div>
-          <p className="mb-1 text-sm font-medium text-slate-600 dark:text-slate-300">Tags</p>
-          <div className="flex flex-wrap gap-1">
-            {tags.data?.items.map((tag) => {
-              const on = deal.tags.some((item) => item.id === tag.id);
-              return (
-                <button
-                  key={tag.id}
-                  type="button"
-                  onClick={() => toggleTag(tag.id)}
-                  className={
-                    on
-                      ? "rounded-full bg-slate-900 px-2 py-0.5 text-xs text-white dark:bg-slate-100 dark:text-slate-900"
-                      : "rounded-full bg-slate-100 px-2 py-0.5 text-xs dark:bg-slate-800"
-                  }
-                >
-                  {tag.name}
-                </button>
-              );
-            })}
+    <div className="flex flex-col gap-5 lg:flex-row">
+      <div className="flex w-full flex-col gap-3.5 lg:w-[340px] lg:shrink-0">
+        <div className="ui-card p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-base font-semibold tracking-[-0.015em] text-slate-900 dark:text-slate-100">
+              {contact?.name ?? "Deal"}
+            </h2>
+            {onClose && (
+              <Button variant="ghost" size="sm" onClick={onClose}>
+                Close
+              </Button>
+            )}
           </div>
-        </div>
 
-        {dealFields.data && dealFields.data.items.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
-              Additional fields
-            </p>
-            {dealFields.data.items.map((field) => (
-              <Field key={field.id} label={field.label + (field.required ? " *" : "")}>
-                <CustomValueInput
-                  field={field}
-                  value={
-                    customDraft?.[field.key] ?? (deal.custom as Record<string, unknown>)[field.key]
-                  }
-                  onChange={(value) =>
-                    setCustomDraft((prev) => ({ ...(prev ?? {}), [field.key]: value }))
+          <div className="flex flex-col gap-3">
+            <Field label="Title">
+              <Input
+                defaultValue={deal.title}
+                key={`title-${deal.updated_at}`}
+                onChange={(event) => edit("title", event.target.value)}
+              />
+            </Field>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Amount, USD">
+                <Input
+                  type="number"
+                  min="0"
+                  defaultValue={deal.amount ?? ""}
+                  key={`amount-${deal.updated_at}`}
+                  onChange={(event) =>
+                    edit("amount", event.target.value === "" ? null : Number(event.target.value))
                   }
                 />
               </Field>
-            ))}
+              <Field label="Viewing">
+                <Input
+                  type="datetime-local"
+                  defaultValue={isoToLocalInput(deal.trial_at)}
+                  key={`trial-${deal.updated_at}`}
+                  onChange={(event) => edit("trial_at", localInputToIso(event.target.value))}
+                />
+              </Field>
+            </div>
+            <Field label="Owner">
+              <select
+                value={(draft?.owner_id as string) ?? deal.owner_id ?? ""}
+                onChange={(event) => edit("owner_id", event.target.value || null)}
+                className="ui-select w-full"
+              >
+                <option value="">Unassigned</option>
+                {users.data?.items.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Stage">
+              <StageSelect deal={deal} onChange={changeStage} />
+            </Field>
+
+            <div>
+              <p className="mb-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                Tags
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {tags.data?.items.map((tag) => {
+                  const on = deal.tags.some((item) => item.id === tag.id);
+                  return (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      onClick={() => toggleTag(tag.id)}
+                      className={
+                        on
+                          ? "rounded-md bg-brand-600 px-2 py-0.5 text-xs font-medium text-white dark:bg-brand-500"
+                          : "rounded-md border border-slate-200/80 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/70 dark:text-slate-300"
+                      }
+                    >
+                      {tag.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {dealFields.data && dealFields.data.items.length > 0 && (
+              <div className="flex flex-col gap-2 border-t border-slate-100 pt-2 dark:border-slate-800">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                  Additional fields
+                </p>
+                {dealFields.data.items.map((field) => (
+                  <Field key={field.id} label={field.label + (field.required ? " *" : "")}>
+                    <CustomValueInput
+                      field={field}
+                      value={
+                        customDraft?.[field.key] ??
+                        (deal.custom as Record<string, unknown>)[field.key]
+                      }
+                      onChange={(value) =>
+                        setCustomDraft((prev) => ({ ...(prev ?? {}), [field.key]: value }))
+                      }
+                    />
+                  </Field>
+                ))}
+              </div>
+            )}
+
+            {dirty && (
+              <Button onClick={() => void saveDraft()} disabled={updateDeal.isPending}>
+                Save changes
+              </Button>
+            )}
+
+            <div className="flex flex-wrap gap-1.5 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+              <Button size="sm" onClick={() => setShowWon(true)}>
+                Won
+              </Button>
+              <Button size="sm" variant="danger" onClick={() => setShowLost(true)}>
+                Lost
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => setShowNote(true)}>
+                Note
+              </Button>
+              {deal.stage_locked && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() =>
+                    unlockDeal.mutate(deal.id, { onError: (error) => toastError(push, error) })
+                  }
+                >
+                  Return control to bot
+                </Button>
+              )}
+            </div>
           </div>
-        )}
-
-        {dirty && (
-          <Button onClick={() => void saveDraft()} disabled={updateDeal.isPending}>
-            Save changes
-          </Button>
-        )}
-
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => setShowWon(true)}>
-            Won
-          </Button>
-          <Button size="sm" variant="danger" onClick={() => setShowLost(true)}>
-            Lost
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => setShowNote(true)}>
-            Note
-          </Button>
-          {deal.stage_locked && (
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() =>
-                unlockDeal.mutate(deal.id, { onError: (error) => toastError(push, error) })
-              }
-            >
-              Return control to bot
-            </Button>
-          )}
         </div>
 
-        <div className="rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-900">
-          <p className="mb-1 font-medium">Bot data</p>
-          <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
+        <DealViewingPanel deal={deal} contact={contact} />
+
+        <div className="ui-card p-3.5 text-xs">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            Bot data
+          </p>
+          <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
             {BOT_FIELDS.map((field) => (
               <div key={field.key} className="flex flex-col">
-                <dt className="text-slate-500">{field.label}</dt>
-                <dd>
+                <dt className="text-[11px] text-slate-500">{field.label}</dt>
+                <dd className="font-medium text-slate-800 dark:text-slate-200">
                   {String(
                     (contact?.custom as Record<string, unknown> | undefined)?.[field.key] ?? "—",
                   )}
@@ -398,13 +411,15 @@ export function DealDetail({ dealId, onClose }: { dealId: string; onClose?: () =
             ))}
           </dl>
           {contact?.whatsapp_id && (
-            <p className="mt-1 text-xs text-slate-500">Chat: {contact.whatsapp_id}</p>
+            <p className="mt-2 border-t border-slate-100 pt-2 font-mono text-[11px] text-slate-500 dark:border-slate-800">
+              Chat: {contact.whatsapp_id}
+            </p>
           )}
         </div>
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="mb-2 flex gap-1">
+        <div className="mb-2.5 inline-flex rounded-md border border-slate-200/90 bg-slate-100/80 p-0.5 dark:border-slate-800 dark:bg-[#14171D]">
           {(
             [
               ["chat", "Chat"],
@@ -417,8 +432,8 @@ export function DealDetail({ dealId, onClose }: { dealId: string; onClose?: () =
               onClick={() => setTab(id)}
               className={
                 tab === id
-                  ? "rounded-full bg-slate-900 px-2.5 py-1 text-xs text-white dark:bg-slate-100 dark:text-slate-900"
-                  : "rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                  ? "rounded-[5px] bg-white px-3 py-1 text-xs font-medium text-slate-900 shadow-subtle dark:bg-[#1E222B] dark:text-white"
+                  : "rounded-[5px] px-3 py-1 text-xs font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
               }
             >
               {label}
@@ -427,17 +442,17 @@ export function DealDetail({ dealId, onClose }: { dealId: string; onClose?: () =
         </div>
         {tab === "chat" ? (
           contact?.whatsapp_id ? (
-            <div className="h-[60vh] min-h-[320px] rounded-lg border border-slate-200 dark:border-slate-800">
+            <div className="ui-card h-[60vh] min-h-[320px] overflow-hidden">
               <ChatPanel whatsappId={contact.whatsapp_id} contactName={contact.name} />
             </div>
           ) : (
-            <p className="text-sm text-slate-500">This contact has no chat yet.</p>
+            <p className="text-xs text-slate-500">This contact has no chat yet.</p>
           )
         ) : (
           <Timeline dealId={deal.id} />
         )}
-        <div className="mt-3 flex flex-col gap-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-          <p className="text-sm font-medium">Quick task</p>
+        <div className="ui-card mt-3 flex flex-col gap-2 p-3.5">
+          <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">Quick task</p>
           <div className="flex flex-col gap-2 md:flex-row">
             <Input
               value={taskTitle}
@@ -485,7 +500,7 @@ function StageSelect({ deal, onChange }: { deal: Deal; onChange: (stageId: strin
     <select
       value={deal.stage_id}
       onChange={(event) => onChange(event.target.value)}
-      className="h-11 md:h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-base md:text-sm dark:border-slate-700 dark:bg-slate-900"
+      className="ui-select w-full"
     >
       <StageOptions pipelineId={deal.pipeline_id} />
     </select>

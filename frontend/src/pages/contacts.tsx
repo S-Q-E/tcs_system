@@ -24,6 +24,7 @@ import { useMe } from "@/api/auth";
 import { api } from "@/api/client";
 import { toastError, useToast } from "@/components/toast";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 const ALL_COLUMNS = [
@@ -77,10 +78,12 @@ export function ContactsPage() {
     setParams(next);
   };
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-xl font-bold">Contacts</h1>
-        <nav className="flex flex-wrap gap-1 text-sm md:ml-4">
+    <div className="flex flex-col gap-3.5">
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-base font-semibold tracking-[-0.015em] text-slate-900 dark:text-slate-100">
+          Contacts
+        </h1>
+        <nav className="inline-flex rounded-md border border-slate-200/90 bg-slate-100/80 p-0.5 dark:border-slate-800 dark:bg-[#14171D]">
           {[
             ["list", "List"],
             ["duplicates", "Duplicates"],
@@ -92,10 +95,10 @@ export function ContactsPage() {
               type="button"
               onClick={() => setTab(id)}
               className={cn(
-                "rounded-md px-2 py-1",
+                "rounded-[5px] px-2.5 py-1 text-xs font-medium transition-all",
                 tab === id
-                  ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-                  : "hover:bg-slate-100 dark:hover:bg-slate-800",
+                  ? "bg-white text-slate-900 shadow-subtle dark:bg-[#1E222B] dark:text-white"
+                  : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200",
               )}
             >
               {label}
@@ -189,8 +192,8 @@ function ContactsList() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <input
+      <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200/80 bg-white/80 p-2 shadow-subtle dark:border-slate-800/80 dark:bg-[#121418]/80">
+        <Input
           aria-label="Quick search"
           placeholder="Quick search: name, phone, email…"
           value={search}
@@ -201,13 +204,13 @@ function ContactsList() {
             setParams(next);
             setOffset(0);
           }}
-          className="h-11 w-full rounded-md border border-slate-200 bg-white px-2 text-base dark:border-slate-700 dark:bg-slate-900 sm:w-72 md:h-9 md:text-sm"
+          className="w-full sm:w-64"
         />
         <select
           aria-label="Owner"
           value={ownerId}
           onChange={(e) => setOwnerId(e.target.value)}
-          className="h-11 md:h-9 rounded-md border border-slate-200 bg-white px-1 text-base md:text-sm dark:border-slate-700 dark:bg-slate-900"
+          className="ui-select"
         >
           <option value="">All owners</option>
           {users.data?.items.map((u) => (
@@ -220,37 +223,39 @@ function ContactsList() {
           aria-label="Source"
           value={source}
           onChange={(e) => setSource(e.target.value)}
-          className="h-11 md:h-9 rounded-md border border-slate-200 bg-white px-1 text-base md:text-sm dark:border-slate-700 dark:bg-slate-900"
+          className="ui-select"
         >
           <option value="">All sources</option>
           <option value="bot">Bot</option>
           <option value="manual">Manual</option>
           <option value="import">Import</option>
         </select>
-        <a
-          className="text-sm text-blue-600 hover:underline"
-          href={exportUrl("contacts", "csv", qs)}
-        >
-          CSV
-        </a>
-        <a
-          className="text-sm text-blue-600 hover:underline"
-          href={exportUrl("contacts", "xlsx", qs)}
-        >
-          XLSX
-        </a>
+        <div className="ml-auto flex items-center gap-1.5">
+          <a
+            className="inline-flex h-8 items-center rounded-md border border-slate-200/90 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-subtle hover:bg-slate-50 dark:border-slate-800 dark:bg-[#161920] dark:text-slate-200 dark:hover:bg-[#1D212A]"
+            href={exportUrl("contacts", "csv", qs)}
+          >
+            CSV
+          </a>
+          <a
+            className="inline-flex h-8 items-center rounded-md border border-slate-200/90 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-subtle hover:bg-slate-50 dark:border-slate-800 dark:bg-[#161920] dark:text-slate-200 dark:hover:bg-[#1D212A]"
+            href={exportUrl("contacts", "xlsx", qs)}
+          >
+            XLSX
+          </a>
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-medium">Views:</span>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="font-semibold uppercase tracking-wider text-slate-400">Views:</span>
         {savedViews.data?.items.map((v) => (
           <span
             key={v.id}
-            className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-0.5 dark:border-slate-700"
+            className="inline-flex items-center gap-1 rounded-md border border-slate-200/80 bg-white px-2 py-0.5 font-medium text-slate-700 shadow-subtle dark:border-slate-800 dark:bg-[#14171D] dark:text-slate-300"
           >
             <button
               type="button"
-              className="hover:underline"
+              className="hover:text-brand-600 dark:hover:text-brand-400"
               onClick={() => {
                 setOwnerId(v.filters.owner_id ?? "");
                 setSource(v.filters.source ?? "");
@@ -273,22 +278,22 @@ function ContactsList() {
             </button>
           </span>
         ))}
-        <input
+        <Input
           aria-label="View name"
           placeholder="View name…"
           value={viewName}
           onChange={(e) => setViewName(e.target.value)}
-          className="h-11 md:h-8 w-40 rounded-md border border-slate-200 bg-white px-2 text-base md:text-sm dark:border-slate-700 dark:bg-slate-900"
+          className="h-7 w-36"
         />
         <Button size="sm" variant="secondary" onClick={() => void saveView()}>
           Save view
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 text-xs">
-        <span className="font-medium">Columns:</span>
+      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 dark:text-slate-400">
+        <span className="font-semibold uppercase tracking-wider text-slate-400">Columns:</span>
         {ALL_COLUMNS.map((col) => (
-          <label key={col.id} className="flex items-center gap-1">
+          <label key={col.id} className="inline-flex cursor-pointer items-center gap-1.5">
             <input
               type="checkbox"
               checked={columns.includes(col.id)}
@@ -300,13 +305,15 @@ function ContactsList() {
       </div>
 
       {selected.size > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 text-sm dark:border-slate-700 dark:bg-slate-900">
-          <span className="font-medium">Selected: {selected.size}</span>
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-brand-200 bg-brand-50/50 p-2.5 text-xs dark:border-brand-900/50 dark:bg-brand-950/20">
+          <span className="font-semibold text-brand-800 dark:text-brand-200">
+            Selected: {selected.size}
+          </span>
           <select
             aria-label="Bulk: owner"
             value={bulkOwner}
             onChange={(e) => setBulkOwner(e.target.value)}
-            className="h-11 md:h-8 rounded-md border border-slate-200 bg-white px-1 dark:border-slate-700 dark:bg-slate-900"
+            className="ui-select"
           >
             <option value="">Owner…</option>
             {users.data?.items.map((u) => (
@@ -319,7 +326,7 @@ function ContactsList() {
             aria-label="Bulk: tag"
             value={bulkTag}
             onChange={(e) => setBulkTag(e.target.value)}
-            className="h-11 md:h-8 rounded-md border border-slate-200 bg-white px-1 dark:border-slate-700 dark:bg-slate-900"
+            className="ui-select"
           >
             <option value="">Tag…</option>
             {tags.data?.items.map((t) => (
@@ -342,11 +349,11 @@ function ContactsList() {
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-        <table className="w-full min-w-160 text-left text-sm">
+      <div className="ui-table-wrapper">
+        <table className="ui-table min-w-160">
           <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-800">
-              <th className="w-8 p-2">
+            <tr>
+              <th className="w-8">
                 <input
                   type="checkbox"
                   aria-label="Select all"
@@ -359,7 +366,7 @@ function ContactsList() {
                 />
               </th>
               {columns.map((col) => (
-                <th key={col} className="p-2">
+                <th key={col}>
                   <button
                     type="button"
                     onClick={() =>
@@ -377,23 +384,20 @@ function ContactsList() {
                                   : col,
                       )
                     }
-                    className="font-medium hover:underline"
+                    className="font-medium hover:text-slate-900 dark:hover:text-white"
                   >
                     {ALL_COLUMNS.find((c) => c.id === col)?.label}
                     {sort.replace("-", "") === col && (sort.startsWith("-") ? " ↓" : " ↑")}
                   </button>
                 </th>
               ))}
-              <th className="p-2 font-medium">Actions</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {items.map((c) => (
-              <tr
-                key={c.id}
-                className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-              >
-                <td className="p-2">
+              <tr key={c.id}>
+                <td>
                   <input
                     type="checkbox"
                     aria-label={`Select ${c.name ?? c.phone ?? c.id}`}
@@ -409,20 +413,20 @@ function ContactsList() {
                   />
                 </td>
                 {columns.map((col) => (
-                  <td key={col} className="max-w-60 truncate p-2">
+                  <td key={col} className="max-w-60 truncate">
                     {col === "name" ? (
                       <Link
-                        className="font-medium text-blue-600 hover:underline"
+                        className="font-medium text-brand-600 hover:underline dark:text-brand-400"
                         to={`/contacts/${c.id}`}
                       >
                         {c.name ?? "—"}
                       </Link>
                     ) : col === "phone" ? (
-                      (c.phone ?? "—")
+                      <span className="font-mono text-xs">{c.phone ?? "—"}</span>
                     ) : col === "email" ? (
                       (c.email ?? "—")
                     ) : col === "telegram" ? (
-                      (c.whatsapp_id ?? "—")
+                      <span className="font-mono text-xs">{c.whatsapp_id ?? "—"}</span>
                     ) : col === "owner" ? (
                       (users.data?.items.find((u) => u.id === c.owner_id)?.name ?? "—")
                     ) : (
@@ -430,10 +434,10 @@ function ContactsList() {
                     )}
                   </td>
                 ))}
-                <td className="p-2">
+                <td>
                   <button
                     type="button"
-                    className="text-red-600 hover:underline"
+                    className="text-xs font-medium text-red-600 hover:underline dark:text-red-400"
                     onClick={() => {
                       if (window.confirm("Move this contact to trash?")) {
                         void remove.mutateAsync(c.id).catch((e: unknown) => toastError(push, e));
@@ -447,14 +451,14 @@ function ContactsList() {
             ))}
           </tbody>
         </table>
-        {list.isPending && <p className="p-4 text-sm text-slate-500">Loading…</p>}
-        {list.isError && <p className="p-4 text-sm text-red-600">Could not load contacts.</p>}
+        {list.isPending && <p className="p-4 text-xs text-slate-500">Loading…</p>}
+        {list.isError && <p className="p-4 text-xs text-red-600">Could not load contacts.</p>}
         {!list.isPending && items.length === 0 && (
-          <p className="p-4 text-sm text-slate-500">No contacts. Adjust the filters.</p>
+          <p className="p-4 text-xs text-slate-500">No contacts. Adjust the filters.</p>
         )}
       </div>
 
-      <div className="flex items-center gap-2 text-sm">
+      <div className="flex items-center gap-2 text-xs text-slate-500">
         <Button
           variant="secondary"
           size="sm"
@@ -463,7 +467,7 @@ function ContactsList() {
         >
           Back
         </Button>
-        <span>
+        <span className="font-mono">
           {offset + 1}–{Math.min(offset + limit, total)} of {total}
         </span>
         <Button
@@ -485,40 +489,41 @@ function DuplicatesView() {
   const merge = useMergeContacts();
   const [winners, setWinners] = useState<Record<string, string>>({});
   const groups = dup.data?.groups ?? [];
-  if (dup.isPending) return <p className="text-sm text-slate-500">Looking for duplicates…</p>;
-  if (dup.isError) return <p className="text-sm text-red-600">Could not load duplicates.</p>;
-  if (groups.length === 0) return <p className="text-sm text-slate-500">No duplicates found.</p>;
+  if (dup.isPending) return <p className="text-xs text-slate-500">Looking for duplicates…</p>;
+  if (dup.isError) return <p className="text-xs text-red-600">Could not load duplicates.</p>;
+  if (groups.length === 0) return <p className="text-xs text-slate-500">No duplicates found.</p>;
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm text-slate-500">
-        Groups: {groups.length}. Merging moves deals, notes, tasks and tags; the source
-        stays in the trash.
+      <p className="text-xs text-slate-500">
+        Groups: {groups.length}. Merging moves deals, notes, tasks and tags; the source stays in
+        the trash.
       </p>
       {groups.map((g) => (
-        <div
-          key={g.key}
-          className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
-        >
-          <p className="text-sm font-medium">
-            {g.kind === "phone" ? "Phone" : "Email"}: {g.value}
+        <div key={g.key} className="ui-card p-3.5">
+          <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">
+            {g.kind === "phone" ? "Phone" : "Email"}:{" "}
+            <span className="font-mono">{g.value}</span>
           </p>
           <div className="mt-2 flex flex-col gap-1">
             {g.contact_ids.map((id) => (
-              <label key={id} className="flex items-center gap-2 text-sm">
+              <label key={id} className="flex items-center gap-2 text-xs">
                 <input
                   type="radio"
                   name={`winner-${g.key}`}
                   checked={winners[g.key] === id}
                   onChange={() => setWinners((prev) => ({ ...prev, [g.key]: id }))}
                 />
-                <Link className="text-blue-600 hover:underline" to={`/contacts/${id}`}>
+                <Link
+                  className="font-mono text-brand-600 hover:underline dark:text-brand-400"
+                  to={`/contacts/${id}`}
+                >
                   {id.slice(0, 8)}
                 </Link>
                 <span className="text-slate-500">keep as primary</span>
               </label>
             ))}
           </div>
-          <div className="mt-2 flex gap-2">
+          <div className="mt-2.5 flex gap-2">
             {g.contact_ids
               .filter((id) => id !== winners[g.key])
               .map((loser) => (
@@ -618,12 +623,13 @@ function ImportView() {
   }, [finished, running]);
 
   return (
-    <div className="flex max-w-2xl flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="font-medium">Import CSV</h2>
+    <div className="ui-card flex max-w-2xl flex-col gap-3 p-4">
+      <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Import CSV</h2>
       <input
         aria-label="CSV file"
         type="file"
         accept=".csv,text/csv"
+        className="text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-brand-700 hover:file:bg-brand-100 dark:text-slate-300 dark:file:bg-brand-950/60 dark:file:text-brand-300"
         onChange={(e) => {
           const f = e.target.files?.[0] ?? null;
           setFile(f);
@@ -632,15 +638,17 @@ function ImportView() {
         }}
       />
       {header.length > 0 && (
-        <div className="flex flex-col gap-1 text-sm">
-          <p className="font-medium">Column mapping:</p>
+        <div className="flex flex-col gap-1.5 text-xs">
+          <p className="font-medium text-slate-700 dark:text-slate-300">Column mapping:</p>
           {header.map((col) => (
             <label key={col} className="flex items-center gap-2">
-              <span className="w-40 truncate font-mono text-xs">{col}</span>
+              <span className="w-40 truncate font-mono text-xs text-slate-600 dark:text-slate-400">
+                {col}
+              </span>
               <select
                 value={mapping[col] ?? "ignore"}
                 onChange={(e) => setMapping((prev) => ({ ...prev, [col]: e.target.value }))}
-                className="h-11 md:h-8 rounded-md border border-slate-200 bg-white px-1 dark:border-slate-700 dark:bg-slate-900"
+                className="ui-select"
               >
                 {IMPORT_FIELDS.map((f) => (
                   <option key={f} value={f}>
@@ -666,7 +674,7 @@ function ImportView() {
         </Button>
       </div>
       {preview && (
-        <div className="text-sm">
+        <div className="rounded-md bg-slate-50 p-3 text-xs dark:bg-slate-800/50">
           <p>
             Total rows: {preview.total}, valid: {preview.valid}, with errors: {preview.invalid}
           </p>
@@ -682,7 +690,7 @@ function ImportView() {
         </div>
       )}
       {job.data && (
-        <div className="text-sm">
+        <div className="rounded-md bg-slate-50 p-3 text-xs dark:bg-slate-800/50">
           <p>
             Job {job.data.id}: {job.data.status}, ok: {job.data.ok_count}, errors:{" "}
             {job.data.error_count}
@@ -708,25 +716,28 @@ function TrashView() {
   const trash = useTrash("all");
   const restoreContact = useRestoreContact();
   if (me.data && me.data.role !== "admin") {
-    return <p className="text-sm text-slate-500">Trash is available to admins only.</p>;
+    return <p className="text-xs text-slate-500">Trash is available to admins only.</p>;
   }
-  if (trash.isPending) return <p className="text-sm text-slate-500">Loading trash…</p>;
-  if (trash.isError)
-    return <p className="text-sm text-red-600">No access or loading error.</p>;
+  if (trash.isPending) return <p className="text-xs text-slate-500">Loading trash…</p>;
+  if (trash.isError) return <p className="text-xs text-red-600">No access or loading error.</p>;
   const items = trash.data?.items ?? [];
-  if (items.length === 0) return <p className="text-sm text-slate-500">Trash is empty.</p>;
+  if (items.length === 0) return <p className="text-xs text-slate-500">Trash is empty.</p>;
   return (
     <div className="flex flex-col gap-2">
       {items.map((item) => (
         <div
           key={`${item.kind}-${item.id}`}
-          className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-2 text-sm dark:border-slate-800 dark:bg-slate-900"
+          className="ui-card flex items-center gap-3 px-3.5 py-2.5 text-xs"
         >
-          <span className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">{item.kind}</span>
-          <span className="font-medium">{item.name ?? item.id.slice(0, 8)}</span>
+          <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[11px] dark:border-slate-800 dark:bg-slate-800">
+            {item.kind}
+          </span>
+          <span className="font-medium text-slate-900 dark:text-slate-100">
+            {item.name ?? item.id.slice(0, 8)}
+          </span>
           <button
             type="button"
-            className="ml-auto text-blue-600 hover:underline"
+            className="ml-auto font-medium text-brand-600 hover:underline dark:text-brand-400"
             onClick={() => {
               const doRestore =
                 item.kind === "contact"

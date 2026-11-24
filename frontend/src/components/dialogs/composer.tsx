@@ -48,7 +48,7 @@ export function ChatComposer({
       {showWarning && (
         <p
           role="alert"
-          className="mb-2 rounded-md bg-amber-50 px-2 py-1.5 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200"
+          className="mb-2 rounded-md border border-amber-200/80 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/60 dark:text-amber-200"
         >
           The bot is replying right now — sending will pause it.
         </p>
@@ -75,11 +75,11 @@ export function ChatComposer({
             }
           }}
           className={cn(
-            "min-h-11 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-base",
-            "placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400",
+            "min-h-10 w-full rounded-md border border-slate-200/90 bg-white px-3 py-2 text-base shadow-subtle transition-all",
+            "placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20",
             "disabled:cursor-not-allowed disabled:opacity-60",
-            "dark:border-slate-700 dark:bg-slate-900",
-            "md:min-h-9 md:text-sm",
+            "dark:border-slate-800 dark:bg-[#121418] dark:text-slate-100",
+            "md:min-h-9 md:text-[13px]",
           )}
         />
         <Button

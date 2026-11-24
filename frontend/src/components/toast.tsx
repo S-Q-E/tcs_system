@@ -42,12 +42,14 @@ export function Toaster() {
           role="status"
           className={
             toast.variant === "error"
-              ? "rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900 dark:bg-red-950 dark:text-red-100"
-              : "rounded-md border border-slate-200 bg-white p-3 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-900"
+              ? "rounded-lg border border-red-200/90 bg-red-50/95 px-3.5 py-2.5 text-xs text-red-900 shadow-elevated backdrop-blur-md dark:border-red-900/80 dark:bg-red-950/95 dark:text-red-100"
+              : "rounded-lg border border-slate-200/90 bg-white/95 px-3.5 py-2.5 text-xs text-slate-900 shadow-elevated backdrop-blur-md dark:border-slate-800 dark:bg-[#161920]/95 dark:text-slate-100"
           }
         >
-          <p className="font-medium">{toast.title}</p>
-          {toast.description && <p className="mt-0.5">{toast.description}</p>}
+          <p className="font-semibold tracking-[-0.01em]">{toast.title}</p>
+          {toast.description && (
+            <p className="mt-0.5 text-[11px] opacity-80">{toast.description}</p>
+          )}
         </div>
       ))}
     </div>

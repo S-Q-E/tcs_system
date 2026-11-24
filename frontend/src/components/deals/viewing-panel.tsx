@@ -48,11 +48,11 @@ export function DealViewingPanel({ deal, contact }: { deal: Deal; contact: Conta
   };
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
-      <div className="mb-2 flex items-center justify-between">
-        <p className="font-medium">Viewing</p>
+    <div className="ui-card p-3.5 text-xs">
+      <div className="mb-2.5 flex items-center justify-between">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Viewing</p>
         {activeBooking && (
-          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-950 dark:text-blue-200">
+          <span className="rounded-md bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700 ring-1 ring-inset ring-brand-500/20 dark:bg-brand-950/50 dark:text-brand-300">
             {activeBooking.status}
           </span>
         )}
@@ -60,15 +60,15 @@ export function DealViewingPanel({ deal, contact }: { deal: Deal; contact: Conta
 
       {activeBooking ? (
         <div className="flex flex-col gap-2">
-          <p className="font-medium text-slate-900 dark:text-slate-100">
+          <p className="font-mono text-xs font-semibold text-slate-900 dark:text-slate-100">
             {formatEtDateTime(activeBooking.slot_starts_at)}
           </p>
           {activeBooking.unit_label && (
-            <p className="text-xs text-slate-600 dark:text-slate-300">
-              Unit: {activeBooking.unit_label}
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Unit: <span className="font-medium text-slate-700 dark:text-slate-200">{activeBooking.unit_label}</span>
             </p>
           )}
-          <div className="flex flex-wrap gap-2">
+          <div className="mt-1 flex flex-wrap gap-1.5">
             <Button size="sm" variant="secondary" onClick={() => setShowReschedule(true)}>
               Reschedule
             </Button>
@@ -97,7 +97,7 @@ export function DealViewingPanel({ deal, contact }: { deal: Deal; contact: Conta
             aria-label="Viewing unit"
             value={selectedUnitId}
             onChange={(e) => setSelectedUnitId(e.target.value)}
-            className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-xs dark:border-slate-700 dark:bg-slate-900"
+            className="ui-select w-full text-xs"
           >
             <option value="">Unit (optional)</option>
             {unitsQuery.data?.items.map((u) => (
@@ -110,7 +110,7 @@ export function DealViewingPanel({ deal, contact }: { deal: Deal; contact: Conta
             aria-label="Open viewing slot"
             value={selectedSlotId}
             onChange={(e) => setSelectedSlotId(e.target.value)}
-            className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-xs dark:border-slate-700 dark:bg-slate-900"
+            className="ui-select w-full text-xs"
           >
             <option value="">Choose an open slot…</option>
             {openSlotsQuery.data?.items.map((s) => (

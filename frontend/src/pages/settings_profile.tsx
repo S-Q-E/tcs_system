@@ -27,8 +27,10 @@ const TIMEZONES = [
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="mb-3 font-semibold">{title}</h2>
+    <section className="ui-card p-4">
+      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+        {title}
+      </h2>
       {children}
     </section>
   );
@@ -79,10 +81,10 @@ export function ProfileTab() {
   };
 
   return (
-    <div className="grid max-w-3xl gap-4">
+    <div className="grid max-w-3xl gap-3.5">
       <Card title="Personal details">
-        <div className="flex flex-col gap-2">
-          <p className="text-sm text-slate-500">
+        <div className="flex flex-col gap-2.5">
+          <p className="text-xs text-slate-500">
             {me.data?.email} · role {me.data?.role === "admin" ? "administrator" : "manager"}
           </p>
           <div className="flex gap-2">
@@ -99,7 +101,7 @@ export function ProfileTab() {
       </Card>
 
       <Card title="Change password">
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2.5">
           <Input
             type="password"
             placeholder="Current password"
@@ -128,7 +130,7 @@ export function ProfileTab() {
 
       <Card title="Display">
         <div className="flex flex-col gap-3">
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300">
             Timezone
             <select
               value={prefs.timezone}
@@ -142,7 +144,7 @@ export function ProfileTab() {
               ))}
             </select>
           </label>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300">
             <input
               type="checkbox"
               checked={prefs.sound}
@@ -161,25 +163,26 @@ export function ProfileTab() {
       </Card>
 
       <Card title="Active sessions">
-        {sessions.isPending && <p className="text-sm text-slate-500">Loading…</p>}
+        {sessions.isPending && <p className="text-xs text-slate-500">Loading…</p>}
         {sessions.data && (
           <div className="flex flex-col gap-2">
             {sessions.data.items.map((item) => (
               <div
                 key={item.id}
-                className="flex items-center gap-2 rounded-md border border-slate-100 px-2 py-1.5 text-sm dark:border-slate-800"
+                className="flex items-center gap-2 rounded-md border border-slate-100 px-3 py-2 text-xs dark:border-slate-800"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate">
+                  <p className="truncate font-medium text-slate-800 dark:text-slate-100">
                     {item.user_agent || "Unknown device"}
                     {item.is_current && (
-                      <span className="ml-2 rounded bg-emerald-100 px-1.5 text-xs text-emerald-800">
+                      <span className="ml-2 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-500/20 dark:bg-emerald-950/60 dark:text-emerald-300">
                         this device
                       </span>
                     )}
                   </p>
-                  <p className="text-xs text-slate-500">
-                    {item.ip || "—"} · signed in {formatInTimezone(item.created_at, prefs.timezone)}
+                  <p className="mt-0.5 font-mono text-[11px] text-slate-500">
+                    {item.ip || "—"} · signed in{" "}
+                    {formatInTimezone(item.created_at, prefs.timezone)}
                   </p>
                 </div>
                 {!item.is_current && (

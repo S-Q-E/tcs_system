@@ -48,20 +48,24 @@ export function BoardColumnView({
     <section
       aria-label={column.name}
       className={cn(
-        "flex max-h-full w-72 shrink-0 flex-col rounded-xl bg-slate-200/60 dark:bg-slate-900/60",
-        isOver && "ring-2 ring-slate-400",
+        "flex max-h-full w-72 shrink-0 flex-col rounded-lg border border-slate-200/75 bg-slate-100/60 transition-all dark:border-slate-800/80 dark:bg-[#111318]",
+        isOver && "border-brand-400/70 bg-brand-50/30 ring-2 ring-brand-500/20 dark:border-brand-500/50 dark:bg-brand-950/15",
       )}
     >
-      <header className="flex items-center gap-2 px-3 pb-2 pt-3">
+      <header className="flex items-center gap-2 border-b border-slate-200/60 px-3 py-2.5 dark:border-slate-800/70">
         <span
           aria-hidden
-          className="h-2.5 w-2.5 shrink-0 rounded-full"
+          className="h-2 w-2 shrink-0 rounded-full"
           style={{ backgroundColor: color }}
         />
-        <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{column.name}</h2>
-        <span className="text-xs text-slate-500 dark:text-slate-400">{column.total}</span>
+        <h2 className="min-w-0 flex-1 truncate text-xs font-semibold tracking-[-0.01em] text-slate-800 dark:text-slate-100">
+          {column.name}
+        </h2>
+        <span className="rounded-md bg-slate-200/70 px-1.5 py-0.5 font-mono text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+          {column.total}
+        </span>
       </header>
-      <p className="px-3 pb-2 text-xs text-slate-500 dark:text-slate-400">
+      <p className="px-3 py-1.5 font-mono text-[11px] font-medium text-slate-500 dark:text-slate-400">
         {formatMoney(column.amount_total)}
       </p>
 
@@ -89,7 +93,7 @@ export function BoardColumnView({
           })}
         </SortableContext>
         {column.items.length === 0 && (
-          <p className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-xs text-slate-400 dark:border-slate-700">
+          <p className="rounded-md border border-dashed border-slate-300/80 p-5 text-center text-xs text-slate-400 dark:border-slate-800 dark:text-slate-500">
             Drop a deal here
           </p>
         )}
@@ -105,14 +109,14 @@ export function BoardColumnView({
         )}
       </div>
 
-      <div className="p-2">
+      <div className="border-t border-slate-200/50 p-1.5 dark:border-slate-800/60">
         <Button
           variant="ghost"
           size="sm"
-          className="w-full"
+          className="w-full justify-start text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
           onClick={() => onQuickCreate(column.stage_id)}
         >
-          <Plus className="h-4 w-4" /> Quick deal
+          <Plus className="h-3.5 w-3.5" /> Quick deal
         </Button>
       </div>
       {activeStageId === column.stage_id && <span className="sr-only">Target column</span>}

@@ -159,10 +159,6 @@ export function Layout() {
           </form>
 
           <div className="ml-auto flex items-center gap-1.5">
-            <div className="hidden items-center gap-1.5 rounded-full border border-amber-300/80 bg-amber-50/90 px-2.5 py-0.5 text-[11px] font-medium text-amber-800 dark:border-amber-800/70 dark:bg-amber-950/40 dark:text-amber-300 sm:inline-flex">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-              DEMO — fictional data
-            </div>
             <RealtimeStatus />
             <Button variant="ghost" size="icon" onClick={toggle} title="Toggle theme">
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -221,10 +217,6 @@ export function Layout() {
         </header>
 
         <main className="min-w-0 flex-1 p-3 pb-24 md:p-6 md:pb-6">
-          <div className="mb-3 flex items-center gap-1.5 rounded-md border border-amber-300/80 bg-amber-50/90 px-2.5 py-1 text-[11px] font-medium text-amber-800 dark:border-amber-800/70 dark:bg-amber-950/40 dark:text-amber-300 sm:hidden">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-            DEMO — fictional data
-          </div>
           <Outlet />
         </main>
       </div>
